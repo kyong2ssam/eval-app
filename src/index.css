@@ -1,22 +1,15 @@
+/* 1. index.html을 건드리지 않고, CSS 최상단에서 네이버 공식 마루 부리 CSS를 불러옵니다 */
+@import url('https://hangeul.pstatic.net/hangeul_static/css/maru-buri.css');
 @import "tailwindcss";
 
-/* 1. 강원교육모두체 폰트 불러오기 (일반 굵기) */
-@font-face {
-    font-family: 'GangwonEdu';
-    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFLightA.woff') format('woff');
-    font-weight: 400;
-    font-style: normal;
+/* 2. 웹앱 전체 요소에 네이버 공식 폰트명(MaruBuri) 강제 적용 */
+*, html, body, div, p, h1, h2, h3, span, a, label, select, input, button, textarea {
+  font-family: 'MaruBuri', serif !important;
 }
 
-/* 2. 강원교육모두체 폰트 불러오기 (두꺼운 굵기) */
-@font-face {
-    font-family: 'GangwonEdu';
-    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFBoldA.woff') format('woff');
-    font-weight: 700;
-    font-style: normal;
-}
-
-/* 3. Tailwind의 기본 폰트를 강원교육모두체로 덮어씌우기 (Tailwind v4 방식) */
-@theme {
-    --font-sans: 'GangwonEdu', sans-serif;
+/* 3. 입력창 및 선택 상자 하단 글자 잘림 현상 완벽 방지 (여백 및 줄간격 보정) */
+select, input, button {
+  line-height: 1.6 !important;
+  padding-top: 0.6rem !important;
+  padding-bottom: 0.6rem !important;
 }
