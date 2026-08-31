@@ -5,7 +5,7 @@ import { checkHwpxMemo } from './utils/hwpxUtils';
 
 // === 환경변수에 GAS_URL을 설정하세요 ===
 // .env 파일에 VITE_GAS_URL=당신의_가스_URL 추가
-const GAS_URL = import.meta.env.https://script.google.com/macros/s/AKfycbwJ7VMwNeK2LaZc2c5VSiWoO1bHZoUS0FO5br-5xRL0I2XAN27Chaza2m9CrsPNcKH8nw/exec;
+const GAS_URL = import.meta.env.VITE_GAS_URL;
 
 // API 호출 헬퍼
 const fetchGas = async (action, payload = {}) => {
