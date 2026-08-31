@@ -175,8 +175,12 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6">
-      <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden">
+    
+    return (
+    <div 
+      onContextMenu={(e) => e.preventDefault()} 
+      className="min-h-screen bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6 flex flex-col">
+      <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden flex-1">
         
         {/* 헤더 (완벽한 블랙) */}
         <div className="p-6 sm:p-8 border-b border-zinc-200 bg-zinc-900 text-white flex justify-between items-center">
@@ -395,6 +399,9 @@ export default function App() {
           )}
 
         </div>
+      </div>
+      <div className="mt-6 mb-2 text-center text-sm font-bold text-zinc-400 tracking-widest select-none">
+        created by. 쿙쌤
       </div>
     </div>
   );
