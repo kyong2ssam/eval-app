@@ -25,7 +25,7 @@ export default function App() {
   const GOOGLE_SHEET_EDIT_URL = "https://docs.google.com/spreadsheets/d/1Xwjex3Bl6oo96G-tkvHV_gPxZkkA8QTvBQ1dPg4kYWs/edit?usp=sharing";
   const GOOGLE_DRIVE_FOLDER_URL = "https://drive.google.com/drive/u/0/folders/1jPgvQ6QmSAHVDk4xcASHX8i8SDsXJM9u";
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwJ7VMwNeK2LaZc2c5VSiWoO1bHZoUS0FO5br-5xRL0I2XAN27Chaza2m9CrsPNcKH8nw/exec";
-  const ADMIN_PASSWORD = "1234";
+  const ADMIN_PASSWORD = "0418";
 
   const [isAutoTerm, setIsAutoTerm] = useState(true);
   const [termInfo, setTermInfo] = useState(getAutoAcademicTerm());
