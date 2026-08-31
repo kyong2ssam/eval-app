@@ -1,1 +1,22 @@
 @import "tailwindcss";
+
+/* 1. 강원교육모두체 폰트 불러오기 (일반 굵기) */
+@font-face {
+    font-family: 'GangwonEdu';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFLightA.woff') format('woff');
+    font-weight: 400;
+    font-style: normal;
+}
+
+/* 2. 강원교육모두체 폰트 불러오기 (두꺼운 굵기) */
+@font-face {
+    font-family: 'GangwonEdu';
+    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2201-2@1.0/GangwonEdu_OTFBoldA.woff') format('woff');
+    font-weight: 700;
+    font-style: normal;
+}
+
+/* 3. Tailwind의 기본 폰트를 강원교육모두체로 덮어씌우기 (Tailwind v4 방식) */
+@theme {
+    --font-sans: 'GangwonEdu', sans-serif;
+}
