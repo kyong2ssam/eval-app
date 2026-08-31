@@ -30,25 +30,36 @@ export default function App() {
   const GAS_URL = "https://script.google.com/macros/s/AKfycbwJ7VMwNeK2LaZc2c5VSiWoO1bHZoUS0FO5br-5xRL0I2XAN27Chaza2m9CrsPNcKH8nw/exec";
   const ADMIN_PASSWORD = "0418";
 
-  // 현재 시스템이 바라보는 학기 정보 (탭 1 사용)
   const [isAutoTerm, setIsAutoTerm] = useState(true);
   const [termInfo, setTermInfo] = useState(getAutoAcademicTerm());
-
-  // 💡 관리자 화면 전용 학기 조회 필터
   const [adminQuery, setAdminQuery] = useState({ year: termInfo.year, semester: termInfo.semester });
 
   const [inputPassword, setInputPassword] = useState('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
 
-  // 제출된 파일 목록
   const [submittedFiles, setSubmittedFiles] = useState([]);
   const [isFetchingFiles, setIsFetchingFiles] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  
+  // 💡 드래그 앤 드롭 상태 관리
+  const [isDragging, setIsDragging] = useState(false);
 
   const [formData, setFormData] = useState({
     category: '보통교과', grade: '1학년', department: '', subject: '', file: null,
   });
+
+  // 💡 F12(개발자 도구) 원천 차단 기능 추가
+  useEffect(() => {
+    const blockF12 = (e) => {
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        return false;
+      }
+    };
+    window.addEventListener('keydown', blockF12);
+    return () => window.removeEventListener('keydown', blockF12);
+  }, []);
 
   useEffect(() => {
     if (isAutoTerm) {
@@ -58,13 +69,11 @@ export default function App() {
     }
   }, [isAutoTerm]);
 
-  // 탭 변경 시 목록 로드
   useEffect(() => {
     if (activeTab === 'form') fetchFiles(termInfo.year, termInfo.semester);
     if (activeTab === 'admin' && isAdminLoggedIn) fetchFiles(adminQuery.year, adminQuery.semester);
   }, [activeTab, isAdminLoggedIn]);
 
-  // 지정한 연도/학기의 파일 목록 불러오기
   const fetchFiles = async (year, semester) => {
     setIsFetchingFiles(true);
     try {
@@ -80,12 +89,10 @@ export default function App() {
     setIsFetchingFiles(false);
   };
 
-  // 관리자 파일 조회 버튼
   const handleAdminSearch = () => {
     fetchFiles(adminQuery.year, adminQuery.semester);
   };
 
-  // 전체 압축 다운로드
   const handleZipDownload = async () => {
     setIsZipping(true);
     try {
@@ -106,7 +113,6 @@ export default function App() {
     setIsZipping(false);
   };
 
-  // 파일 삭제
   const handleDeleteFile = async (fileId, fileName) => {
     if (!window.confirm(`'${fileName}'을 삭제하시겠습니까?`)) return;
     try {
@@ -134,6 +140,34 @@ export default function App() {
     setFormData(prev => ({ ...prev, category, grade: defaultGrade, department: defaultDept }));
   };
 
+  // 💡 드래그 앤 드롭 이벤트 핸들러
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile.name.endsWith('.hwpx')) {
+        setFormData(prev => ({ ...prev, file: droppedFile }));
+      } else {
+        alert("오직 .hwpx 확장자 파일만 지원합니다.");
+      }
+    }
+  };
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFormData(prev => ({ ...prev, file: e.target.files[0] }));
@@ -142,7 +176,7 @@ export default function App() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!formData.file) return alert("파일을 선택해 주세요.");
+    if (!formData.file) return alert("파일을 첨부해 주세요.");
 
     const reader = new FileReader();
     reader.readAsDataURL(formData.file);
@@ -175,17 +209,16 @@ export default function App() {
   };
 
   return (
-    
-    return (
+    // 💡 우클릭 방지 유지 (onContextMenu)
     <div 
       onContextMenu={(e) => e.preventDefault()} 
-      className="min-h-screen bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6 flex flex-col">
+      className="min-h-screen bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6 flex flex-col"
+    >
       <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden flex-1">
         
-        {/* 헤더 (완벽한 블랙) */}
+        {/* 헤더 */}
         <div className="p-6 sm:p-8 border-b border-zinc-200 bg-zinc-900 text-white flex justify-between items-center">
           <div>
-            {/* 💡 요청하신 '(자동인식)' 표기 완벽 삭제 */}
             <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">
               {termInfo.year}학년도 {termInfo.semester}
             </span>
@@ -201,7 +234,7 @@ export default function App() {
           )}
         </div>
 
-        {/* 탭 버튼 (그레이 스케일) */}
+        {/* 탭 버튼 */}
         <div className="flex border-b border-zinc-300 bg-zinc-50 px-6 sm:px-8">
           <button onClick={() => setActiveTab('form')} className={`py-4 px-2 mr-6 text-sm font-bold transition-all border-b-2 ${activeTab === 'form' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>01. 파일 제출</button>
           <button onClick={() => setActiveTab('sheet')} className={`py-4 px-2 mr-6 text-sm font-bold transition-all border-b-2 ${activeTab === 'sheet' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>02. 평가 비율 작성</button>
@@ -214,6 +247,7 @@ export default function App() {
           {/* TAB 1: 폼(좌) + 현황(우) */}
           {activeTab === 'form' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              
               {/* 좌: 제출 폼 */}
               <div>
                 <h2 className="text-xl font-black text-zinc-900 mb-6">파일 제출하기</h2>
@@ -257,13 +291,25 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* 💡 파일 드래그 앤 드롭 영역 */}
                   <div>
                     <label className="block text-xs font-bold text-zinc-700 mb-2">파일 첨부 (.hwpx)</label>
-                    <div className="border-2 border-dashed border-zinc-300 hover:border-zinc-900 rounded-lg p-6 text-center bg-white cursor-pointer transition-colors">
+                    <div 
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                        isDragging 
+                          ? 'border-zinc-900 bg-zinc-200' 
+                          : 'border-zinc-300 bg-white hover:border-zinc-900'
+                      }`}
+                    >
                       <input type="file" accept=".hwpx" onChange={handleFileChange} className="hidden" id="file-upload" />
                       <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
-                        <span className="text-2xl mb-2">📄</span>
-                        <span className="text-sm font-bold text-zinc-900">{formData.file ? formData.file.name : "클릭하여 파일 선택"}</span>
+                        <span className="text-2xl mb-2">{isDragging ? "📥" : "📄"}</span>
+                        <span className="text-sm font-bold text-zinc-900">
+                          {formData.file ? formData.file.name : "클릭하거나 파일을 이곳에 드래그하세요"}
+                        </span>
                       </label>
                     </div>
                   </div>
@@ -299,7 +345,7 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 3: 관리자 (블랙 앤 화이트) */}
+          {/* TAB 3: 관리자 */}
           {activeTab === 'admin' && (
             <div>
               {!isAdminLoggedIn ? (
@@ -314,8 +360,6 @@ export default function App() {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  
-                  {/* 관리자 2단 탭 */}
                   <div className="flex space-x-2 border-b border-zinc-300 pb-4 mb-6">
                     <button onClick={() => setAdminSubTab('files')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${adminSubTab === 'files' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>📂 파일 관리 및 다운로드</button>
                     <button onClick={() => setAdminSubTab('settings')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${adminSubTab === 'settings' ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}>⚙️ 시스템 환경 설정</button>
@@ -324,8 +368,6 @@ export default function App() {
                   {/* 파일 관리 탭 */}
                   {adminSubTab === 'files' && (
                     <div className="bg-white border border-zinc-300 rounded-xl overflow-hidden">
-                      
-                      {/* 💡 특정 연도/학기 조회 및 전체 압축 다운로드 영역 */}
                       <div className="bg-zinc-100 p-4 border-b border-zinc-300 flex flex-wrap justify-between items-center gap-4">
                         <div className="flex items-center space-x-2">
                           <input type="text" value={adminQuery.year} onChange={(e) => setAdminQuery({...adminQuery, year: e.target.value})} className="w-20 bg-white border border-zinc-300 rounded px-2 py-1 text-sm font-bold text-center" />
@@ -356,7 +398,6 @@ export default function App() {
                                   <td className="py-3 px-4 text-xs text-zinc-600 font-bold">{file.path.split(' > ').map(stripNumber).join(' > ')}</td>
                                   <td className="py-3 px-4 font-bold text-zinc-900">{file.name}</td>
                                   <td className="py-3 px-4 flex justify-center gap-2">
-                                    {/* 💡 개별 파일 다운로드 버튼 */}
                                     <a href={file.downloadUrl} className="text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold">저장</a>
                                     <button onClick={() => handleDeleteFile(file.id, file.name)} className="text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold">삭제</button>
                                   </td>
@@ -369,7 +410,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 시스템 환경 설정 탭 */}
+                  {/* 설정 탭 */}
                   {adminSubTab === 'settings' && (
                     <div className="bg-white border border-zinc-300 rounded-xl p-8">
                       <h3 className="text-lg font-black text-zinc-900 mb-6">메인 화면 학년도/학기 제어</h3>
@@ -392,7 +433,6 @@ export default function App() {
                       </div>
                     </div>
                   )}
-
                 </div>
               )}
             </div>
@@ -400,9 +440,12 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* 💡 하단 워터마크 (드래그 방지 select-none) */}
       <div className="mt-6 mb-2 text-center text-sm font-bold text-zinc-400 tracking-widest select-none">
         created by. 쿙쌤
       </div>
+      
     </div>
   );
 }
