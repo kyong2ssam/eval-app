@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+function App() {
+  const [activeTab, setActiveTab] = useState('form'); 
+  
+  // ▼ 이 부분의 따옴표("") 안에 복사한 구글 시트 주소를 붙여넣기 하세요! ▼
+  const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Xwjex3Bl6oo96G-tkvHV_gPxZkkA8QTvBQ1dPg4kYWs/edit?usp=sharing";
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import { UploadCloud, FileWarning, CheckCircle2, Archive, Loader2 } from 'lucide-react';
 import { checkHwpxMemo } from './utils/hwpxUtils';
