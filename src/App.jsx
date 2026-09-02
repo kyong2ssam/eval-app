@@ -259,18 +259,25 @@ export default function App() {
     setIsZipping(false);
   };
 
-  const handleDeleteFile = (fileId, fileName) => {
-    showConfirm('파일 삭제 확인', `'${fileName}'을(를) 정말로 삭제하시겠습니까?`, async () => {
-      try {
-        const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'delete', fileId }) });
-        const result = await res.json();
-        if (result.result === 'success') {
-          showPopup('success', '삭제 완료', `'${fileName}' 파일이 삭제되었습니다.`);
-          fetchFiles(adminQuery.year, adminQuery.semester);
-        }
-      } catch (err) { showPopup('error', '삭제 실패', '오류가 발생했습니다.'); }
+  // App.jsx 파일 내 handleDelete 함수 예시
+const handleDelete = async (fileId) => {
+  if (!window.confirm("정말 삭제하시겠습니까?")) return;
+  
+  try {
+    const res = await fetch(gasUrl, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', fileId })
     });
-  };
+    const data = await res.json();
+    
+    if (data.result === 'success') {
+      alert("삭제되었습니다.");
+      fetchFileList(); // 💡 삭제 성공 후 제출 목록을 서버에서 다시 불러와 리셋합니다!
+    }
+  } catch (err) {
+    console.error("삭제 중 오류 발생:", err);
+  }
+};
 
   const handleDeleteSelected = () => {
     if (selectedFileIds.length === 0) return showPopup('info', '선택 필요', '삭제할 파일을 선택해 주세요.');
