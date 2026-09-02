@@ -21,17 +21,16 @@ const stripNumber = (str) => {
   return str.replace(/^[0-9]+\.\s*/, ''); 
 };
 
-// HWPX 파일 내 평가 비율 표 자동 분석 함수
+// 💡 [수정됨] HWPX 표 분석 (ArrayBuffer 읽기 방식 적용으로 null 문제 해결)
 const parseHwpxGradingTable = async (file) => {
   try {
-    const zip = new JSZip();
-    const loadedZip = await zip.loadAsync(file);
+    const arrayBuffer = await file.arrayBuffer(); // 파일 읽기 충돌 방지 핵심 코드
+    const zip = await JSZip.loadAsync(arrayBuffer);
     let xmlText = "";
 
-    // 본문 세션 파일 추출
-    for (const filename of Object.keys(loadedZip.files)) {
+    for (const filename of Object.keys(zip.files)) {
       if (filename.toLowerCase().includes('section') && filename.endsWith('.xml')) {
-        xmlText += await loadedZip.files[filename].async('string');
+        xmlText += await zip.files[filename].async('string');
       }
     }
 
@@ -42,33 +41,22 @@ const parseHwpxGradingTable = async (file) => {
     const textNodes = Array.from(xmlDoc.getElementsByTagName("hp:t"));
     const fullText = textNodes.map(node => node.textContent || "").join(" ");
 
-    // 과목 유형 자동 판별 (NCS 여부)
     const isNCS = fullText.includes("능력단위");
 
-    // 추출할 기본 데이터 구조 초기화
     const result = {
       isNCS,
-      exam1: { select: 0, subj: 0, essay: 0, ratio: 0 }, // 1차 정기시험
-      exam2: { select: 0, subj: 0, essay: 0, ratio: 0 }, // 2차 정기시험
+      exam1: { select: 0, subj: 0, essay: 0, ratio: 0 },
+      exam2: { select: 0, subj: 0, essay: 0, ratio: 0 },
       performance: {
-        subjEssay: 0, // 서논술형 (서술형+논술형)
-        subj: 0,      // 서술형
-        essay: 0,     // 논술형
-        project: 0,   // 프로젝트
-        lab: 0,       // 실험실습
-        portfolio: 0, // 포트폴리오
-        etc: 0,       // 기타
-        totalRatio: 0 // 수행 전체 비율
+        subjEssay: 0, subj: 0, essay: 0, project: 0, lab: 0, portfolio: 0, etc: 0, totalRatio: 0
       },
-      domains: [] // 수행평가 세부 영역 및 점수
+      domains: []
     };
 
-    // 표(Table) 태그 추출
     const tables = xmlDoc.getElementsByTagName("hp:tbl");
     for (let t = 0; t < tables.length; t++) {
       const tableText = tables[t].textContent || "";
       
-      // 평가 비율 관련 표 탐지
       if (tableText.includes("정기") || tableText.includes("수행") || tableText.includes("반영비율") || tableText.includes("반영 비율")) {
         const trs = tables[t].getElementsByTagName("hp:tr");
         
@@ -77,21 +65,18 @@ const parseHwpxGradingTable = async (file) => {
           const tNodes = Array.from(trs[r].getElementsByTagName("hp:t")).map(n => (n.textContent || "").trim());
           const nums = tNodes.map(v => parseFloat(v)).filter(v => !isNaN(v));
 
-          // 1차 시험 데이터 추출
           if (rowText.includes("1차")) {
             if (nums.length >= 2) {
               result.exam1.select = nums[0] || 0;
               result.exam1.ratio = nums[nums.length - 1] || 0;
             }
           } 
-          // 2차 시험 데이터 추출
           else if (rowText.includes("2차")) {
             if (nums.length >= 2) {
               result.exam2.select = nums[0] || 0;
               result.exam2.ratio = nums[nums.length - 1] || 0;
             }
           }
-          // 수행평가 항목 추출 및 유형별 누적 합산
           else if (rowText.includes("수행") || (!rowText.includes("정기") && nums.length > 0)) {
             if (rowText.includes("서술") || rowText.includes("논술") || rowText.includes("서논술")) {
               const val = nums[0] || 0;
@@ -103,7 +88,6 @@ const parseHwpxGradingTable = async (file) => {
             if (rowText.includes("포트폴리오")) result.performance.portfolio += (nums[0] || 0);
             if (rowText.includes("기타") || rowText.includes("보고서") || rowText.includes("태도")) result.performance.etc += (nums[0] || 0);
             
-            // 세부 영역명 및 점수 저장
             const domainName = tNodes.find(t => t.length > 2 && !t.includes("수행") && isNaN(parseFloat(t)));
             if (domainName && nums.length > 0) {
               result.domains.push({ name: domainName, score: nums[0] });
@@ -123,13 +107,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('form');
   const [adminSubTab, setAdminSubTab] = useState('status'); 
 
-  // 🔑 1. 마스터 열쇠 주소 (웹에 게시된 CSV 링크를 여기에 쏙 넣어주세요!)
+  // 마스터 열쇠 주소
   const MASTER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQs9DStK-ysk-iwHWkSkunG2KXH3Rqb6abjWCCQF42pTdrdTN21LA1p0Q9jPukbj9EzxATe_jQ3rRfh/pub?output=csv";
   const ADMIN_PASSWORD = "0418";
 
-  // 💡 상태 관리
-  const [gasUrl, setGasUrl] = useState(''); // 마스터 시트에서 읽어올 GAS 주소
-  const [globalSheetUrl, setGlobalSheetUrl] = useState(''); // 서버에서 읽어올 시트 주소
+  const [gasUrl, setGasUrl] = useState(''); 
+  const [globalSheetUrl, setGlobalSheetUrl] = useState(''); 
   
   const [isAutoTerm, setIsAutoTerm] = useState(true);
   const [termInfo, setTermInfo] = useState(getAutoAcademicTerm());
@@ -172,19 +155,16 @@ export default function App() {
     if (storedMyFiles) setMyFiles(JSON.parse(storedMyFiles));
   }, []);
 
-  // 💡 [핵심] 사이트 접속 시 1.마스터키 읽기 -> 2.서버 설정 읽기
   useEffect(() => {
     const initApp = async () => {
       try {
-        // 1. 마스터 시트에서 GAS 주소 가져오기
         const csvRes = await fetch(MASTER_CSV_URL);
         const csvText = await csvRes.text();
-        const fetchedGasUrl = csvText.split('\n')[0].split(',')[0].trim(); // A1 셀 데이터 추출
+        const fetchedGasUrl = csvText.split('\n')[0].split(',')[0].trim(); 
         
         if (fetchedGasUrl.startsWith('https://script.google.com')) {
           setGasUrl(fetchedGasUrl);
 
-          // 2. 가져온 GAS 주소로 중앙 설정(학기, 구글시트 주소) 불러오기
           const configRes = await fetch(fetchedGasUrl, { method: 'POST', body: JSON.stringify({ action: 'getConfig' }) });
           const result = await configRes.json();
           if (result.result === 'success') {
@@ -195,24 +175,14 @@ export default function App() {
               setAdminQuery({ year: result.year, semester: result.semester });
             }
           }
-        } else {
-          console.error("올바른 GAS 주소를 찾지 못했습니다.");
         }
-      } catch (e) {
-        console.error("초기 설정 로딩 실패", e);
-      } finally {
+      } catch (e) {} finally {
         setIsLoadingConfig(false);
       }
     };
-    
-    if (MASTER_CSV_URL !== "여기에_마스터_시트_CSV_링크를_넣어주세요") {
-      initApp();
-    } else {
-      setIsLoadingConfig(false);
-    }
+    initApp();
   }, []);
 
-  // 관리자 탭 파일 목록 조회
   useEffect(() => {
     if (activeTab === 'admin' && isAdminLoggedIn && gasUrl) fetchFiles(adminQuery.year, adminQuery.semester);
   }, [activeTab, isAdminLoggedIn, termInfo, adminQuery, gasUrl]);
@@ -259,25 +229,26 @@ export default function App() {
     setIsZipping(false);
   };
 
-  // App.jsx 파일 내 handleDelete 함수 예시
-const handleDelete = async (fileId) => {
-  if (!window.confirm("정말 삭제하시겠습니까?")) return;
-  
-  try {
-    const res = await fetch(gasUrl, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'delete', fileId })
+  // 💡 [수정됨] 관리자 개별 삭제 버튼 동작 (이름 일치 및 즉시 화면 지우기 적용)
+  const handleDeleteFile = async (fileId, fileName) => {
+    showConfirm('삭제 확인', `'${fileName}' 파일을 삭제하시겠습니까?`, async () => {
+      try {
+        const res = await fetch(gasUrl, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'delete', fileId })
+        });
+        const data = await res.json();
+        if (data.result === 'success') {
+          showPopup('success', '삭제 완료', '파일이 삭제되었습니다.');
+          setSubmittedFiles(prev => prev.filter(f => f.id !== fileId)); // 즉시 화면에서 제거
+        } else {
+          showPopup('error', '삭제 실패', data.message);
+        }
+      } catch (err) {
+        showPopup('error', '삭제 실패', '오류가 발생했습니다.');
+      }
     });
-    const data = await res.json();
-    
-    if (data.result === 'success') {
-      alert("삭제되었습니다.");
-      fetchFileList(); // 💡 삭제 성공 후 제출 목록을 서버에서 다시 불러와 리셋합니다!
-    }
-  } catch (err) {
-    console.error("삭제 중 오류 발생:", err);
-  }
-};
+  };
 
   const handleDeleteSelected = () => {
     if (selectedFileIds.length === 0) return showPopup('info', '선택 필요', '삭제할 파일을 선택해 주세요.');
@@ -334,7 +305,6 @@ const handleDelete = async (fileId) => {
     if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, file: e.target.files[0] }));
   };
 
-  // 💡 HWPX 파일 메모 검사 (섹션 본문 검사 완벽 적용)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!gasUrl) return showPopup('error', '서버 연결 실패', '마스터 시트의 주소를 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.');
@@ -372,40 +342,43 @@ const handleDelete = async (fileId) => {
     expectedParts.push("교수학습 및 평가 운영 계획");
     const expectedPrefix = expectedParts.join(" ");
 
-    const isDuplicate = myFiles.some(f => f.subject.startsWith(expectedPrefix));
-    if (isDuplicate) {
-      setIsSubmitting(false);
-      return showPopup('info', '제출 완료된 평가계획입니다.', `'${expectedPrefix}'은 이미 제출되었습니다.`);
-    }
+    // 💡 [수정됨] 재제출 차단 알림 제거 및 자동 덮어쓰기 허용 (로컬스토리지 오류 해결)
+    // const isDuplicate = myFiles.some(f => f.subject.startsWith(expectedPrefix));
+    // if (isDuplicate) { return 차단 로직 삭제 }
 
     const reader = new FileReader();
     reader.readAsDataURL(formData.file);
     reader.onload = async () => {
-      // 기존 reader.onload 내부의 payload 생성 부분 업데이트
-const parsedGradingData = await parseHwpxGradingTable(formData.file);
+      const parsedGradingData = await parseHwpxGradingTable(formData.file);
 
       const payload = {
-  action: 'upload',
-  year: termInfo.year,
-  semester: termInfo.semester,
-  category: formData.category,
-  grade: formData.grade,
-  department: formData.department,
-  subject: formData.subject,
-  fileName: formData.file.name,
-  fileData: reader.result,
-  gradingData: parsedGradingData // 💡 이 줄이 반드시 있어야 합니다!!!
-};
+        action: 'upload',
+        year: termInfo.year,
+        semester: termInfo.semester,
+        category: formData.category,
+        grade: formData.grade,
+        department: formData.department,
+        subject: formData.subject,
+        fileName: formData.file.name,
+        fileData: reader.result,
+        gradingData: parsedGradingData // ArrayBuffer로 안전하게 파싱된 표 데이터 탑재
+      };
+      
       try {
         const response = await fetch(gasUrl, { method: 'POST', body: JSON.stringify(payload) });
         const result = await response.json();
+        
         if (result.result === 'success') {
           const newRecord = {
             id: Date.now(), term: `${termInfo.year}학년도 ${termInfo.semester}`,
             subject: expectedPrefix + '.hwpx', date: new Date().toLocaleString(),
             fileUrl: result.fileUrl || result.downloadUrl || ''
           };
-          const updatedMyFiles = [newRecord, ...myFiles];
+          
+          // 기존에 같은 과목 기록이 있으면 덮어씌움
+          const filteredFiles = myFiles.filter(f => !f.subject.startsWith(expectedPrefix));
+          const updatedMyFiles = [newRecord, ...filteredFiles];
+          
           setMyFiles(updatedMyFiles);
           localStorage.setItem('mySubmittedFiles', JSON.stringify(updatedMyFiles));
 
@@ -418,7 +391,6 @@ const parsedGradingData = await parseHwpxGradingTable(formData.file);
     };
   };
 
-  // 💡 관리자가 설정값을 GAS 서버에 저장
   const saveConfigToServer = async () => {
     try {
       const payload = { action: 'setConfig', sheetUrl: globalSheetUrl, isAutoTerm, year: termInfo.year, semester: termInfo.semester };
@@ -450,7 +422,7 @@ const parsedGradingData = await parseHwpxGradingTable(formData.file);
             {popup.onConfirm ? (
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setPopup({ ...popup, isOpen: false })} className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-3.5 rounded-lg transition-colors cursor-pointer">취소</button>
-                <button onClick={() => { const action = popup.onConfirm; setPopup({ ...popup, isOpen: false }); if (action) action(); }} className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-lg transition-colors cursor-pointer">삭제</button>
+                <button onClick={() => { const action = popup.onConfirm; setPopup({ ...popup, isOpen: false }); if (action) action(); }} className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-lg transition-colors cursor-pointer">확인</button>
               </div>
             ) : (
               <button onClick={() => setPopup({ ...popup, isOpen: false })} className="mt-6 w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-lg transition-colors cursor-pointer">확인</button>
@@ -707,7 +679,7 @@ const parsedGradingData = await parseHwpxGradingTable(formData.file);
                     </div>
                   )}
 
-                  {/* 설정 탭 (중앙 통제) */}
+                  {/* 설정 탭 */}
                   {adminSubTab === 'settings' && (
                     <div className="space-y-6">
                       <div className="bg-white border border-zinc-300 rounded-xl p-8">
