@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import JSZip from 'jszip'; 
 
-// 학기 자동 계산 (서버 설정이 없을 때 기본값용)
+// 학기 자동 계산
 const getAutoAcademicTerm = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -25,12 +25,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('form');
   const [adminSubTab, setAdminSubTab] = useState('status'); 
 
-  // 🚨 [필수] GAS 주소는 무조건 여기에 고정으로 박아야 통신이 가능합니다!
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbwJ7VMwNeK2LaZc2c5VSiWoO1bHZoUS0FO5br-5xRL0I2XAN27Chaza2m9CrsPNcKH8nw/exec";
+  // 🔑 1. 마스터 열쇠 주소 (웹에 게시된 CSV 링크를 여기에 쏙 넣어주세요!)
+  const MASTER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQs9DStK-ysk-iwHWkSkunG2KXH3Rqb6abjWCCQF42pTdrdTN21LA1p0Q9jPukbj9EzxATe_jQ3rRfh/pub?output=csv";
   const ADMIN_PASSWORD = "0418";
 
-  // 서버에서 받아올 중앙 설정값들
-  const [globalSheetUrl, setGlobalSheetUrl] = useState('');
+  // 💡 상태 관리
+  const [gasUrl, setGasUrl] = useState(''); // 마스터 시트에서 읽어올 GAS 주소
+  const [globalSheetUrl, setGlobalSheetUrl] = useState(''); // 서버에서 읽어올 시트 주소
+  
   const [isAutoTerm, setIsAutoTerm] = useState(true);
   const [termInfo, setTermInfo] = useState(getAutoAcademicTerm());
   const [adminQuery, setAdminQuery] = useState({ year: termInfo.year, semester: termInfo.semester });
@@ -47,7 +49,6 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingFiles, setIsFetchingFiles] = useState(false);
 
-  // 내 제출 기록 (이건 내 PC 브라우저에 남는 영수증)
   const [myFiles, setMyFiles] = useState([]);
   const [showMyFiles, setShowMyFiles] = useState(false);
 
@@ -59,12 +60,10 @@ export default function App() {
   const showPopup = (type, title, message) => setPopup({ isOpen: true, type, title, message, onConfirm: null });
   const showConfirm = (title, message, onConfirm) => setPopup({ isOpen: true, type: 'warning', title, message, onConfirm });
 
+  // F12 방지
   useEffect(() => {
     const blockF12 = (e) => {
-      if (e.key === 'F12' || e.keyCode === 123) {
-        e.preventDefault();
-        return false;
-      }
+      if (e.key === 'F12' || e.keyCode === 123) { e.preventDefault(); return false; }
     };
     window.addEventListener('keydown', blockF12);
     return () => window.removeEventListener('keydown', blockF12);
@@ -75,46 +74,56 @@ export default function App() {
     if (storedMyFiles) setMyFiles(JSON.parse(storedMyFiles));
   }, []);
 
-  // 💡 [핵심] 사이트 접속 시 GAS 서버에서 세팅값 긁어오기
+  // 💡 [핵심] 사이트 접속 시 1.마스터키 읽기 -> 2.서버 설정 읽기
   useEffect(() => {
-    const fetchConfig = async () => {
+    const initApp = async () => {
       try {
-        const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'getConfig' }) });
-        const result = await res.json();
-        if (result.result === 'success') {
-          setGlobalSheetUrl(result.sheetUrl || '');
-          setIsAutoTerm(result.isAutoTerm);
-          
-          if (!result.isAutoTerm && result.year && result.semester) {
-            setTermInfo({ year: result.year, semester: result.semester });
-            setAdminQuery({ year: result.year, semester: result.semester });
-          } else {
-            const auto = getAutoAcademicTerm();
-            setTermInfo(auto);
-            setAdminQuery(auto);
+        // 1. 마스터 시트에서 GAS 주소 가져오기
+        const csvRes = await fetch(MASTER_CSV_URL);
+        const csvText = await csvRes.text();
+        const fetchedGasUrl = csvText.split('\n')[0].split(',')[0].trim(); // A1 셀 데이터 추출
+        
+        if (fetchedGasUrl.startsWith('https://script.google.com')) {
+          setGasUrl(fetchedGasUrl);
+
+          // 2. 가져온 GAS 주소로 중앙 설정(학기, 구글시트 주소) 불러오기
+          const configRes = await fetch(fetchedGasUrl, { method: 'POST', body: JSON.stringify({ action: 'getConfig' }) });
+          const result = await configRes.json();
+          if (result.result === 'success') {
+            setGlobalSheetUrl(result.sheetUrl || '');
+            setIsAutoTerm(result.isAutoTerm);
+            if (!result.isAutoTerm && result.year && result.semester) {
+              setTermInfo({ year: result.year, semester: result.semester });
+              setAdminQuery({ year: result.year, semester: result.semester });
+            }
           }
+        } else {
+          console.error("올바른 GAS 주소를 찾지 못했습니다.");
         }
       } catch (e) {
-        console.error("서버 설정 로딩 실패");
+        console.error("초기 설정 로딩 실패", e);
       } finally {
         setIsLoadingConfig(false);
       }
     };
-    if (GAS_URL && GAS_URL !== "여기에_GAS_새로배포한_주소를_넣으세요") fetchConfig();
-    else setIsLoadingConfig(false);
+    
+    if (MASTER_CSV_URL !== "여기에_마스터_시트_CSV_링크를_넣어주세요") {
+      initApp();
+    } else {
+      setIsLoadingConfig(false);
+    }
   }, []);
 
+  // 관리자 탭 파일 목록 조회
   useEffect(() => {
-    if (activeTab === 'admin' && isAdminLoggedIn) fetchFiles(adminQuery.year, adminQuery.semester);
-  }, [activeTab, isAdminLoggedIn, termInfo, adminQuery]);
+    if (activeTab === 'admin' && isAdminLoggedIn && gasUrl) fetchFiles(adminQuery.year, adminQuery.semester);
+  }, [activeTab, isAdminLoggedIn, termInfo, adminQuery, gasUrl]);
 
   const fetchFiles = async (year, semester) => {
+    if (!gasUrl) return [];
     setIsFetchingFiles(true);
     try {
-      const res = await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'list', year, semester })
-      });
+      const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'list', year, semester }) });
       const result = await res.json();
       if (result.result === 'success') {
         setSubmittedFiles(result.files);
@@ -128,6 +137,7 @@ export default function App() {
 
   const handleOpenMyFiles = async () => {
     setShowMyFiles(true);
+    if (!gasUrl) return;
     const latestServerFiles = await fetchFiles(termInfo.year, termInfo.semester);
     const validMyFiles = myFiles.filter(myF => latestServerFiles.some(sF => sF.name === myF.subject));
     if (validMyFiles.length !== myFiles.length) {
@@ -141,25 +151,20 @@ export default function App() {
   const handleZipDownload = async () => {
     setIsZipping(true);
     try {
-      const res = await fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'zip', year: adminQuery.year, semester: adminQuery.semester })
-      });
+      const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'zip', year: adminQuery.year, semester: adminQuery.semester }) });
       const result = await res.json();
       if (result.result === 'success') {
         window.open(result.downloadUrl, '_blank');
         showPopup('success', '압축 완료', '압축 파일이 새 창에서 다운로드됩니다.');
       } else showPopup('error', '압축 실패', result.message);
-    } catch (err) {
-      showPopup('error', '오류 발생', '서버와 통신 중 오류가 발생했습니다.');
-    }
+    } catch (err) { showPopup('error', '오류 발생', '서버와 통신 중 오류가 발생했습니다.'); }
     setIsZipping(false);
   };
 
   const handleDeleteFile = (fileId, fileName) => {
     showConfirm('파일 삭제 확인', `'${fileName}'을(를) 정말로 삭제하시겠습니까?`, async () => {
       try {
-        const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', fileId }) });
+        const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'delete', fileId }) });
         const result = await res.json();
         if (result.result === 'success') {
           showPopup('success', '삭제 완료', `'${fileName}' 파일이 삭제되었습니다.`);
@@ -173,7 +178,7 @@ export default function App() {
     if (selectedFileIds.length === 0) return showPopup('info', '선택 필요', '삭제할 파일을 선택해 주세요.');
     showConfirm('선택 삭제 확인', `선택한 ${selectedFileIds.length}개 파일을 삭제하시겠습니까?`, async () => {
       try {
-        const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteBatch', fileIds: selectedFileIds }) });
+        const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'deleteBatch', fileIds: selectedFileIds }) });
         const result = await res.json();
         if (result.result === 'success') {
           showPopup('success', '일괄 삭제 완료', `삭제 완료.`);
@@ -188,7 +193,7 @@ export default function App() {
     showConfirm('전체 삭제 확인 ⚠️', `전체 (${submittedFiles.length}개) 파일을 모두 삭제하시겠습니까?`, async () => {
       const allIds = submittedFiles.map(f => f.id);
       try {
-        const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteBatch', fileIds: allIds }) });
+        const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'deleteBatch', fileIds: allIds }) });
         const result = await res.json();
         if (result.result === 'success') {
           showPopup('success', '전체 삭제 완료', '모든 파일이 삭제되었습니다.');
@@ -198,14 +203,8 @@ export default function App() {
     });
   };
 
-  const handleSelectAll = (e) => {
-    if (e.target.checked) setSelectedFileIds(submittedFiles.map(f => f.id));
-    else setSelectedFileIds([]);
-  };
-
-  const handleSelectOne = (id) => {
-    setSelectedFileIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
-  };
+  const handleSelectAll = (e) => { e.target.checked ? setSelectedFileIds(submittedFiles.map(f => f.id)) : setSelectedFileIds([]); };
+  const handleSelectOne = (id) => { setSelectedFileIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]); };
 
   const handleCategoryChange = (e) => {
     const category = e.target.value;
@@ -230,8 +229,10 @@ export default function App() {
     if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, file: e.target.files[0] }));
   };
 
+  // 💡 HWPX 파일 메모 검사 (섹션 본문 검사 완벽 적용)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!gasUrl) return showPopup('error', '서버 연결 실패', '마스터 시트의 주소를 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     if (!formData.file) return showPopup('error', '파일 누락', '평가계획(.hwpx) 파일을 첨부해 주세요.');
     setIsSubmitting(true);
 
@@ -281,7 +282,7 @@ export default function App() {
         subject: formData.subject, fileName: formData.file.name, fileData: reader.result
       };
       try {
-        const response = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+        const response = await fetch(gasUrl, { method: 'POST', body: JSON.stringify(payload) });
         const result = await response.json();
         if (result.result === 'success') {
           const newRecord = {
@@ -302,22 +303,20 @@ export default function App() {
     };
   };
 
-  // 💡 [핵심] 관리자가 설정을 저장하면 서버(GAS)로 보내서 모든 사람이 공유하게 만듦
+  // 💡 관리자가 설정값을 GAS 서버에 저장
   const saveConfigToServer = async () => {
     try {
       const payload = { action: 'setConfig', sheetUrl: globalSheetUrl, isAutoTerm, year: termInfo.year, semester: termInfo.semester };
-      const res = await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify(payload) });
       const result = await res.json();
       if (result.result === 'success') {
-        showPopup('success', '서버 저장 완료', '설정된 구글 시트 주소와 학기가 모든 사용자에게 즉시 반영됩니다!');
+        showPopup('success', '서버 저장 완료', '설정된 내용이 모든 사용자에게 즉시 반영됩니다!');
       }
-    } catch (err) {
-      showPopup('error', '저장 실패', '서버 저장 중 오류가 발생했습니다.');
-    }
+    } catch (err) { showPopup('error', '저장 실패', '서버 저장 중 오류가 발생했습니다.'); }
   };
 
   if (isLoadingConfig) {
-    return <div className="min-h-screen bg-zinc-100 flex items-center justify-center font-bold text-zinc-500">시스템 설정 불러오는 중...</div>;
+    return <div className="min-h-screen bg-zinc-100 flex items-center justify-center font-bold text-zinc-500">서버 연결 및 시스템 설정 불러오는 중...</div>;
   }
 
   return (
@@ -593,7 +592,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 💡 중앙 통제용 설정 탭 */}
+                  {/* 설정 탭 (중앙 통제) */}
                   {adminSubTab === 'settings' && (
                     <div className="space-y-6">
                       <div className="bg-white border border-zinc-300 rounded-xl p-8">
@@ -631,16 +630,16 @@ export default function App() {
                             )}
                           </div>
 
-                          <button 
-                            onClick={saveConfigToServer} 
-                            className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold px-6 py-4 rounded-xl text-base cursor-pointer transition-colors mt-4 shadow-md"
-                          >
-                            💾 현재 설정값을 서버(GAS)에 저장하고 전체 적용하기
+                          <button onClick={saveConfigToServer} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold px-6 py-4 rounded-xl text-base cursor-pointer transition-colors mt-4 shadow-md">
+                            💾 현재 설정값을 서버에 저장하고 전체 적용하기
                           </button>
                           
-                          <p className="text-xs font-bold text-zinc-500 text-center mt-2">
-                            * 저장을 누르면 접속하는 <span className="text-zinc-900">모든 선생님들의 PC 화면에 즉시 적용</span>됩니다.
-                          </p>
+                          <div className="bg-zinc-50 border border-zinc-200 p-4 rounded-lg mt-4">
+                            <p className="text-xs font-bold text-zinc-500 leading-relaxed">
+                              * 저장을 누르면 접속하는 <span className="text-zinc-900">모든 선생님들의 PC 화면에 즉시 적용</span>됩니다.<br/>
+                              💡 <span className="text-zinc-900">구글 드라이브(서버) 저장소가 바뀐 경우</span> 관리자 화면이 아니라 <strong>'평가계획 마스터 열쇠(구글 시트)'</strong> 안의 텍스트 주소를 새 GAS 주소로 변경하시면 시스템 전체가 자동 이사합니다.
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
