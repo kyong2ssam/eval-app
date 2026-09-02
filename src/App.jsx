@@ -385,10 +385,17 @@ const handleDelete = async (fileId) => {
 const parsedGradingData = await parseHwpxGradingTable(formData.file);
 
       const payload = {
-        action: 'upload', year: termInfo.year, semester: termInfo.semester,
-        category: formData.category, grade: formData.grade, department: formData.department,
-        subject: formData.subject, fileName: formData.file.name, fileData: reader.result
-      };
+  action: 'upload',
+  year: termInfo.year,
+  semester: termInfo.semester,
+  category: formData.category,
+  grade: formData.grade,
+  department: formData.department,
+  subject: formData.subject,
+  fileName: formData.file.name,
+  fileData: reader.result,
+  gradingData: parsedGradingData // 💡 이 줄이 반드시 있어야 합니다!!!
+};
       try {
         const response = await fetch(gasUrl, { method: 'POST', body: JSON.stringify(payload) });
         const result = await response.json();
