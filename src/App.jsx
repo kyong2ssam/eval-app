@@ -21,6 +21,104 @@ const stripNumber = (str) => {
   return str.replace(/^[0-9]+\.\s*/, ''); 
 };
 
+// HWPX 파일 내 평가 비율 표 자동 분석 함수
+const parseHwpxGradingTable = async (file) => {
+  try {
+    const zip = new JSZip();
+    const loadedZip = await zip.loadAsync(file);
+    let xmlText = "";
+
+    // 본문 세션 파일 추출
+    for (const filename of Object.keys(loadedZip.files)) {
+      if (filename.toLowerCase().includes('section') && filename.endsWith('.xml')) {
+        xmlText += await loadedZip.files[filename].async('string');
+      }
+    }
+
+    if (!xmlText) return null;
+
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+    const textNodes = Array.from(xmlDoc.getElementsByTagName("hp:t"));
+    const fullText = textNodes.map(node => node.textContent || "").join(" ");
+
+    // 과목 유형 자동 판별 (NCS 여부)
+    const isNCS = fullText.includes("능력단위");
+
+    // 추출할 기본 데이터 구조 초기화
+    const result = {
+      isNCS,
+      exam1: { select: 0, subj: 0, essay: 0, ratio: 0 }, // 1차 정기시험
+      exam2: { select: 0, subj: 0, essay: 0, ratio: 0 }, // 2차 정기시험
+      performance: {
+        subjEssay: 0, // 서논술형 (서술형+논술형)
+        subj: 0,      // 서술형
+        essay: 0,     // 논술형
+        project: 0,   // 프로젝트
+        lab: 0,       // 실험실습
+        portfolio: 0, // 포트폴리오
+        etc: 0,       // 기타
+        totalRatio: 0 // 수행 전체 비율
+      },
+      domains: [] // 수행평가 세부 영역 및 점수
+    };
+
+    // 표(Table) 태그 추출
+    const tables = xmlDoc.getElementsByTagName("hp:tbl");
+    for (let t = 0; t < tables.length; t++) {
+      const tableText = tables[t].textContent || "";
+      
+      // 평가 비율 관련 표 탐지
+      if (tableText.includes("정기") || tableText.includes("수행") || tableText.includes("반영비율") || tableText.includes("반영 비율")) {
+        const trs = tables[t].getElementsByTagName("hp:tr");
+        
+        for (let r = 0; r < trs.length; r++) {
+          const rowText = trs[r].textContent || "";
+          const tNodes = Array.from(trs[r].getElementsByTagName("hp:t")).map(n => (n.textContent || "").trim());
+          const nums = tNodes.map(v => parseFloat(v)).filter(v => !isNaN(v));
+
+          // 1차 시험 데이터 추출
+          if (rowText.includes("1차")) {
+            if (nums.length >= 2) {
+              result.exam1.select = nums[0] || 0;
+              result.exam1.ratio = nums[nums.length - 1] || 0;
+            }
+          } 
+          // 2차 시험 데이터 추출
+          else if (rowText.includes("2차")) {
+            if (nums.length >= 2) {
+              result.exam2.select = nums[0] || 0;
+              result.exam2.ratio = nums[nums.length - 1] || 0;
+            }
+          }
+          // 수행평가 항목 추출 및 유형별 누적 합산
+          else if (rowText.includes("수행") || (!rowText.includes("정기") && nums.length > 0)) {
+            if (rowText.includes("서술") || rowText.includes("논술") || rowText.includes("서논술")) {
+              const val = nums[0] || 0;
+              result.performance.subjEssay += val;
+              result.performance.subj += val;
+            }
+            if (rowText.includes("프로젝트")) result.performance.project += (nums[0] || 0);
+            if (rowText.includes("실험") || rowText.includes("실습")) result.performance.lab += (nums[0] || 0);
+            if (rowText.includes("포트폴리오")) result.performance.portfolio += (nums[0] || 0);
+            if (rowText.includes("기타") || rowText.includes("보고서") || rowText.includes("태도")) result.performance.etc += (nums[0] || 0);
+            
+            // 세부 영역명 및 점수 저장
+            const domainName = tNodes.find(t => t.length > 2 && !t.includes("수행") && isNaN(parseFloat(t)));
+            if (domainName && nums.length > 0) {
+              result.domains.push({ name: domainName, score: nums[0] });
+            }
+          }
+        }
+      }
+    }
+    return result;
+  } catch (err) {
+    console.error("표 데이터 파싱 중 오류 발생:", err);
+    return null;
+  }
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('form');
   const [adminSubTab, setAdminSubTab] = useState('status'); 
@@ -276,6 +374,9 @@ export default function App() {
     const reader = new FileReader();
     reader.readAsDataURL(formData.file);
     reader.onload = async () => {
+      // 기존 reader.onload 내부의 payload 생성 부분 업데이트
+const parsedGradingData = await parseHwpxGradingTable(formData.file);
+
       const payload = {
         action: 'upload', year: termInfo.year, semester: termInfo.semester,
         category: formData.category, grade: formData.grade, department: formData.department,
