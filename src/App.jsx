@@ -108,8 +108,14 @@ export default function App() {
       const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'zip', year: adminQuery.year, semester: adminQuery.semester }) });
       const result = await res.json();
       if (result.result === 'success') {
-        window.open(result.downloadUrl, '_blank');
-        showPopup('success', '압축 완료', '압축 파일이 새 창에서 다운로드됩니다.');
+        // 💡 브라우저 팝업 차단 우회 (가상 링크 클릭 방식)
+        const link = document.createElement('a');
+        link.href = result.downloadUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showPopup('success', '압축 완료', '압축 파일 다운로드가 시작되었습니다.');
       } else showPopup('error', '압축 실패', result.message);
     } catch (err) { showPopup('error', '오류 발생', '서버와 통신 중 오류가 발생했습니다.'); }
     setIsZipping(false);
