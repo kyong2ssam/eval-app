@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import JSZip from 'jszip'; 
 
 const getAutoAcademicTerm = () => {
   const now = new Date();
@@ -102,19 +103,18 @@ export default function App() {
 
   const handleOpenMyFiles = () => setShowMyFiles(true);
   const handleAdminSearch = () => fetchFiles(adminQuery.year, adminQuery.semester);
+  
   const handleZipDownload = async () => {
     setIsZipping(true);
     try {
       const res = await fetch(gasUrl, { method: 'POST', body: JSON.stringify({ action: 'zip', year: adminQuery.year, semester: adminQuery.semester }) });
       const result = await res.json();
       if (result.result === 'success') {
-        // 💡 브라우저 팝업 차단 우회 (가상 링크 클릭 방식)
         const link = document.createElement('a');
         link.href = result.downloadUrl;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-
         showPopup('success', '압축 완료', '압축 파일 다운로드가 시작되었습니다.');
       } else showPopup('error', '압축 실패', result.message);
     } catch (err) { showPopup('error', '오류 발생', '서버와 통신 중 오류가 발생했습니다.'); }
@@ -202,11 +202,39 @@ export default function App() {
   };
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, file: e.target.files[0] })); };
 
-  // 💡 구글 시트 파싱 및 전송 로직이 완전히 삭제된 제출 함수
+  // 💡 선생님의 완벽한 원본 코드가 이식된 제출 함수
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!gasUrl) return showPopup('error', '서버 연결 실패', '마스터 시트의 주소를 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     if (!formData.file) return showPopup('error', '파일 누락', '평가계획(.hwpx) 파일을 첨부해 주세요.');
+
+    // 🚨 1. 파일 속 메모 존재 여부 검사 (가장 먼저 실행)
+    try {
+      setIsSubmitting(true);
+      const zip = new JSZip(); // 👈 여기서 hwpX 파일을 열어봅니다.
+      const loadedZip = await zip.loadAsync(formData.file);
+      let hasMemo = false;
+
+      // hwpx 압축 속의 xml 파일들을 뒤져서 메모 태그(<hp:memo) 찾기
+      for (const relativePath in loadedZip.files) {
+        if (relativePath.endsWith('.xml')) {
+          const content = await loadedZip.file(relativePath).async('string');
+          // 💡 파일 내용 중에 메모 태그가 하나라도 있는지 검사! (선생님 코드 100% 동일 적용)
+          if (content.includes('<hp:memo') || content.includes('</hp:memo>')) {
+            hasMemo = true;
+            break;
+          }
+        }
+      }
+
+      if (hasMemo) {
+        setIsSubmitting(false);
+        // 💡 메모가 발견되면 서버로 안 보내고 여기서 바로 차단 후 선생님의 경고창을 띄웁니다!
+        return showPopup('error', '메모 삭제 요망 🚨', '파일 내에 [메모]가 남아있습니다.\n\n한글 프로그램 상단의 [검토] 탭에서 "메모 모두 지우기"를 클릭하여 지운 후, 다시 저장해서 제출해 주세요!');
+      }
+    } catch (err) {
+      console.error("메모 검사 중 오류 발생:", err);
+    }
 
     let expectedParts = [`${termInfo.year}학년도`, termInfo.semester];
     if (formData.grade) expectedParts.push(formData.grade);
@@ -218,11 +246,9 @@ export default function App() {
     const expectedPrefix = expectedParts.join(" ");
 
     const executeUpload = () => {
-      setIsSubmitting(true);
       const reader = new FileReader();
       reader.readAsDataURL(formData.file);
       reader.onload = async () => {
-        // 복잡했던 HWPX 파싱 과정 제거
         const payload = {
           action: 'upload', year: termInfo.year, semester: termInfo.semester,
           category: formData.category, grade: formData.grade, department: formData.department,
@@ -329,7 +355,7 @@ export default function App() {
 
         <div className="flex border-b border-zinc-300 bg-zinc-50 px-6 sm:px-8">
           <button onClick={() => setActiveTab('form')} className={`py-4 px-2 mr-6 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'form' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>01. 파일 제출</button>
-          <button onClick={() => setActiveTab('sheet')} className={`py-4 px-2 mr-6 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'sheet' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>02. 평가 비율(수동 작성)</button>
+          <button onClick={() => setActiveTab('sheet')} className={`py-4 px-2 mr-6 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'sheet' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>02. 평가 비율 입력</button>
           <button onClick={() => setActiveTab('admin')} className={`py-4 px-2 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'admin' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>03. 관리자 전용</button>
         </div>
 
@@ -380,7 +406,11 @@ export default function App() {
                         <label htmlFor="file-upload" className="cursor-pointer mb-4"><span className="text-4xl hover:scale-110 transition-transform block">📄</span></label>
                         <div className="flex items-center gap-4 bg-zinc-100 px-5 py-3 rounded-xl border border-zinc-200 shadow-sm">
                           <span className="text-base font-bold text-zinc-900">{formData.file.name}</span>
-                          <button type="button" onClick={(e) => { e.preventDefault(); setFormData({ ...formData, file: null }); document.getElementById('file-upload').value = ''; }} className="text-sm bg-white rounded-full shadow-sm border border-zinc-200 w-8 h-8 flex items-center justify-center cursor-pointer">❌</button>
+                          <button type="button" onClick={(e) => { e.preventDefault(); setFormData({ ...formData, file: null }); document.getElementById('file-upload').value = ''; }} className="bg-white hover:bg-zinc-200 text-zinc-400 hover:text-zinc-900 rounded-full shadow-sm border border-zinc-200 w-8 h-8 flex items-center justify-center cursor-pointer transition-colors duration-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     ) : (
@@ -392,7 +422,7 @@ export default function App() {
                   </div>
                 </div>
                 <button type="submit" disabled={isSubmitting} className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-400 text-white font-bold text-lg py-5 rounded-2xl shadow-md cursor-pointer">
-                  {isSubmitting ? '파일 업로드 중...' : '제출 완료하기'}
+                  {isSubmitting ? '파일 검사 및 업로드 중...' : '제출 완료하기'}
                 </button>
               </form>
             </div>
