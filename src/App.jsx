@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import JSZip from 'jszip'; 
 
 const getAutoAcademicTerm = () => {
   const now = new Date();
@@ -15,111 +14,6 @@ const DEPARTMENTS = [
   "3. 패션디자인과", "4. 시각디자인과", "5. 도예디자인과"
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
-
-// 💡 [해결 2] 강제 텍스트 추출 방식 도입: HWPX 태그 종류에 상관없이 칸 내부 데이터를 무조건 강제 추출
-const parseHwpxGradingTable = async (file) => {
-  try {
-    const arrayBuffer = await file.arrayBuffer();
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    let xmlText = "";
-
-    for (const filename of Object.keys(zip.files)) {
-      if (filename.toLowerCase().includes('section') && filename.endsWith('.xml')) {
-        xmlText += await zip.files[filename].async('string');
-      }
-    }
-    if (!xmlText) return null;
-
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-    const tables = Array.from(xmlDoc.getElementsByTagName("hp:tbl"));
-
-    for (const tbl of tables) {
-      const trs = Array.from(tbl.getElementsByTagName("hp:tr"));
-      if (trs.length < 2) continue;
-
-      const grid = [];
-      for (let r = 0; r < trs.length; r++) {
-        if (!grid[r]) grid[r] = [];
-        const tcs = Array.from(trs[r].getElementsByTagName("hp:tc"));
-        let c = 0;
-        for (let i = 0; i < tcs.length; i++) {
-          const tc = tcs[i];
-          while (grid[r][c] !== undefined) c++;
-          const colSpan = parseInt(tc.getAttribute("colSpan") || tc.getAttribute("colspan") || "1", 10);
-          const rowSpan = parseInt(tc.getAttribute("rowSpan") || tc.getAttribute("rowspan") || "1", 10);
-          
-          // 태그 무시하고 textContent로 텍스트 무조건 강제 추출 (오류 원인 완벽 제거)
-          const text = (tc.textContent || "").replace(/\s+/g, " ").trim();
-          
-          for (let rs = 0; rs < rowSpan; rs++) {
-            for (let cs = 0; cs < colSpan; cs++) {
-              if (!grid[r + rs]) grid[r + rs] = [];
-              grid[r + rs][c + cs] = text;
-            }
-          }
-          c += colSpan;
-        }
-      }
-
-      const fullTblText = grid.flat().join(" ");
-      if (!/1차|2차|중간|기말|정기|수행|비율/.test(fullTblText)) continue;
-
-      let bestResult = null;
-      let maxScore = 0;
-
-      // 가장 데이터가 많은 마지막 행(비율/숫자)부터 위로 탐색
-      for (let r = grid.length - 1; r >= 1; r--) {
-        const colHeaders = [];
-        for (let c = 0; c < grid[r].length; c++) {
-          let h = "";
-          for (let hr = 0; hr < r; hr++) h += (grid[hr][c] || "") + " ";
-          colHeaders.push(h.replace(/\s+/g, ""));
-        }
-
-        const tempResult = {
-          exam1: { select: 0, subj: 0, ratio: 0 },
-          exam2: { select: 0, subj: 0, ratio: 0 },
-          performance: { subjEssay: 0, project: 0, lab: 0, portfolio: 0, etc: 0 }
-        };
-
-        let currentScore = 0;
-        for (let c = 0; c < grid[r].length; c++) {
-          const h = colHeaders[c];
-          const cellText = grid[r][c] || "";
-          const numMatch = cellText.match(/\d+(\.\d+)?/);
-          if (!numMatch) continue;
-          const val = parseFloat(numMatch[0]);
-
-          if (h.includes("1차") || h.includes("중간")) {
-            if (h.includes("선택")) tempResult.exam1.select = val;
-            if (h.includes("서술") || h.includes("논술")) tempResult.exam1.subj = val;
-            if (h.includes("비율") || h.includes("%")) { tempResult.exam1.ratio = val; currentScore += 2; }
-          } else if (h.includes("2차") || h.includes("기말")) {
-            if (h.includes("선택")) tempResult.exam2.select = val;
-            if (h.includes("서술") || h.includes("논술")) tempResult.exam2.subj = val;
-            if (h.includes("비율") || h.includes("%")) { tempResult.exam2.ratio = val; currentScore += 2; }
-          } else if (h.includes("수행")) {
-            if (h.includes("서논술") || h.includes("서술") || h.includes("논술")) { tempResult.performance.subjEssay = val; currentScore++; }
-            if (h.includes("포트폴리오")) { tempResult.performance.portfolio = val; currentScore++; }
-            if (h.includes("프로젝트")) { tempResult.performance.project = val; currentScore++; }
-            if (h.includes("실험") || h.includes("실습")) { tempResult.performance.lab = val; currentScore++; }
-            if (h.includes("기타") || h.includes("보고서") || h.includes("태도")) { tempResult.performance.etc = val; currentScore++; }
-          }
-        }
-
-        if (currentScore > maxScore) { maxScore = currentScore; bestResult = tempResult; }
-      }
-      if (maxScore > 0) return bestResult;
-    }
-    return {
-      exam1: { select: 0, subj: 0, ratio: 0 }, exam2: { select: 0, subj: 0, ratio: 0 },
-      performance: { subjEssay: 0, project: 0, lab: 0, portfolio: 0, etc: 0 }
-    };
-  } catch (err) {
-    return null;
-  }
-};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('form');
@@ -181,7 +75,8 @@ export default function App() {
             }
           }
         }
-      } catch (e) {} finally { setIsLoadingConfig(false); }
+      } catch (e) {
+      } finally { setIsLoadingConfig(false); }
     };
     initApp();
   }, []);
@@ -205,10 +100,7 @@ export default function App() {
     return [];
   };
 
-  const handleOpenMyFiles = async () => {
-    setShowMyFiles(true);
-  };
-
+  const handleOpenMyFiles = () => setShowMyFiles(true);
   const handleAdminSearch = () => fetchFiles(adminQuery.year, adminQuery.semester);
   const handleZipDownload = async () => {
     setIsZipping(true);
@@ -223,7 +115,6 @@ export default function App() {
     setIsZipping(false);
   };
 
-  // 💡 [해결 3] 삭제 시 내 파일(My Files) 및 화면에서 즉시 데이터 파기
   const handleDeleteFile = async (fileId, fileName) => {
     showConfirm('삭제 확인', `'${fileName}' 파일을 삭제하시겠습니까?`, async () => {
       try {
@@ -305,33 +196,11 @@ export default function App() {
   };
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, file: e.target.files[0] })); };
 
+  // 💡 구글 시트 파싱 및 전송 로직이 완전히 삭제된 제출 함수
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!gasUrl) return showPopup('error', '서버 연결 실패', '마스터 시트의 주소를 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     if (!formData.file) return showPopup('error', '파일 누락', '평가계획(.hwpx) 파일을 첨부해 주세요.');
-    setIsSubmitting(true);
-
-    let hasMemo = false;
-    try {
-      const zip = new JSZip();
-      const loadedZip = await zip.loadAsync(formData.file);
-      for (const filename of Object.keys(loadedZip.files)) {
-        if (filename.toLowerCase().includes('section') && filename.endsWith('.xml')) {
-          const content = await loadedZip.files[filename].async('string');
-          if (/type\s*=\s*["']MEMO["']/i.test(content) || /<hp:memo[\s>]/i.test(content)) {
-            hasMemo = true; break; 
-          }
-        }
-      }
-    } catch (err) {
-      setIsSubmitting(false);
-      return showPopup('error', '파일 분석 오류 🚨', '올바른 .hwpx (한글) 파일이 아니거나 손상되었습니다.');
-    }
-
-    if (hasMemo) {
-      setIsSubmitting(false);
-      return showPopup('error', '메모 발견 🚨', '한글 프로그램의 [검토] 탭에서 "메모 모두 지우기" 후 다시 저장해서 제출해 주세요!');
-    }
 
     let expectedParts = [`${termInfo.year}학년도`, termInfo.semester];
     if (formData.grade) expectedParts.push(formData.grade);
@@ -342,42 +211,50 @@ export default function App() {
     expectedParts.push("교수학습 및 평가 운영 계획");
     const expectedPrefix = expectedParts.join(" ");
 
-    const reader = new FileReader();
-    reader.readAsDataURL(formData.file);
-    reader.onload = async () => {
-      const parsedGradingData = await parseHwpxGradingTable(formData.file);
-
-      const payload = {
-        action: 'upload', year: termInfo.year, semester: termInfo.semester,
-        category: formData.category, grade: formData.grade, department: formData.department,
-        subject: formData.subject, fileName: formData.file.name, fileData: reader.result,
-        gradingData: parsedGradingData 
-      };
-      
-      try {
-        const response = await fetch(gasUrl, { method: 'POST', body: JSON.stringify(payload) });
-        const result = await response.json();
+    const executeUpload = () => {
+      setIsSubmitting(true);
+      const reader = new FileReader();
+      reader.readAsDataURL(formData.file);
+      reader.onload = async () => {
+        // 복잡했던 HWPX 파싱 과정 제거
+        const payload = {
+          action: 'upload', year: termInfo.year, semester: termInfo.semester,
+          category: formData.category, grade: formData.grade, department: formData.department,
+          subject: formData.subject, fileName: formData.file.name, fileData: reader.result
+        };
         
-        if (result.result === 'success') {
-          const newRecord = {
-            id: Date.now(), term: `${termInfo.year}학년도 ${termInfo.semester}`,
-            subject: expectedPrefix + '.hwpx', date: new Date().toLocaleString(),
-            fileUrl: result.fileUrl || result.downloadUrl || ''
-          };
+        try {
+          const response = await fetch(gasUrl, { method: 'POST', body: JSON.stringify(payload) });
+          const result = await response.json();
           
-          const filteredFiles = myFiles.filter(f => f.subject !== newRecord.subject);
-          const updatedMyFiles = [newRecord, ...filteredFiles];
-          
-          setMyFiles(updatedMyFiles);
-          localStorage.setItem('mySubmittedFiles', JSON.stringify(updatedMyFiles));
+          if (result.result === 'success') {
+            const newRecord = {
+              id: Date.now(), term: `${termInfo.year}학년도 ${termInfo.semester}`,
+              subject: expectedPrefix + '.hwpx', date: new Date().toLocaleString(),
+              downloadUrl: result.downloadUrl || ''
+            };
+            
+            const filteredFiles = myFiles.filter(f => !f.subject.startsWith(expectedPrefix));
+            const updatedMyFiles = [newRecord, ...filteredFiles];
+            
+            setMyFiles(updatedMyFiles);
+            localStorage.setItem('mySubmittedFiles', JSON.stringify(updatedMyFiles));
 
-          showPopup('success', '제출 완료', '평가계획 파일이 성공적으로 덮어쓰기 제출되었습니다!');
-          setFormData({ ...formData, file: null, subject: '' });
-          document.getElementById('file-upload').value = '';
-        } else showPopup('error', '제출 실패', result.message);
-      } catch (err) { showPopup('error', '통신 오류', '서버 전송 중 오류가 발생했습니다.'); }
-      setIsSubmitting(false);
+            showPopup('success', '제출 완료', '평가계획 파일이 성공적으로 제출되었습니다!');
+            setFormData({ ...formData, file: null, subject: '' });
+            document.getElementById('file-upload').value = '';
+          } else showPopup('error', '제출 실패', result.message);
+        } catch (err) { showPopup('error', '통신 오류', '서버 통신 중 오류가 발생했습니다.'); }
+        setIsSubmitting(false);
+      };
     };
+
+    const isDuplicate = myFiles.some(f => f.subject.startsWith(expectedPrefix));
+    if (isDuplicate) {
+      showConfirm('재제출 안내', `이전에 제출된 기록이 있습니다.\n새로운 파일로 다시 제출(덮어쓰기) 하시겠습니까?`, () => executeUpload());
+    } else {
+      executeUpload();
+    }
   };
 
   const saveConfigToServer = async () => {
@@ -401,8 +278,8 @@ export default function App() {
             <p className="text-sm text-zinc-600 font-bold whitespace-pre-wrap leading-relaxed">{popup.message}</p>
             {popup.onConfirm ? (
               <div className="flex gap-3 mt-6">
-                <button onClick={() => setPopup({ ...popup, isOpen: false })} className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-3.5 rounded-lg cursor-pointer">취소</button>
-                <button onClick={() => { const action = popup.onConfirm; setPopup({ ...popup, isOpen: false }); if (action) action(); }} className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-lg cursor-pointer">확인</button>
+                <button onClick={() => setPopup({ ...popup, isOpen: false })} className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold py-3.5 rounded-lg cursor-pointer">아니오</button>
+                <button onClick={() => { const action = popup.onConfirm; setPopup({ ...popup, isOpen: false }); if (action) action(); }} className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-lg cursor-pointer">예</button>
               </div>
             ) : (
               <button onClick={() => setPopup({ ...popup, isOpen: false })} className="mt-6 w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-lg cursor-pointer">확인</button>
@@ -426,7 +303,7 @@ export default function App() {
                       <span className="text-xs text-zinc-500 font-bold">{file.term} | {file.date}</span>
                       <span className="text-sm font-black text-zinc-900 truncate">{file.subject}</span>
                     </div>
-                    {file.fileUrl && <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3.5 py-2 rounded-lg font-bold shrink-0 cursor-pointer">열기</a>}
+                    {file.downloadUrl && <a href={file.downloadUrl} className="text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3.5 py-2 rounded-lg font-bold shrink-0 cursor-pointer">다운로드</a>}
                   </div>
                 ))
               )}
@@ -446,7 +323,7 @@ export default function App() {
 
         <div className="flex border-b border-zinc-300 bg-zinc-50 px-6 sm:px-8">
           <button onClick={() => setActiveTab('form')} className={`py-4 px-2 mr-6 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'form' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>01. 파일 제출</button>
-          <button onClick={() => setActiveTab('sheet')} className={`py-4 px-2 mr-6 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'sheet' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>02. 평가 비율 작성</button>
+          <button onClick={() => setActiveTab('sheet')} className={`py-4 px-2 mr-6 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'sheet' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>02. 평가 비율(수동 작성)</button>
           <button onClick={() => setActiveTab('admin')} className={`py-4 px-2 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'admin' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>03. 관리자 전용</button>
         </div>
 
@@ -509,7 +386,7 @@ export default function App() {
                   </div>
                 </div>
                 <button type="submit" disabled={isSubmitting} className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-400 text-white font-bold text-lg py-5 rounded-2xl shadow-md cursor-pointer">
-                  {isSubmitting ? '파일 검사 및 제출 중...' : '제출 완료하기'}
+                  {isSubmitting ? '파일 업로드 중...' : '제출 완료하기'}
                 </button>
               </form>
             </div>
