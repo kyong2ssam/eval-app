@@ -16,57 +16,43 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 대용량 파일에서도 뻗지 않고 100% 탐지하는 문자열 기반 메모 스캔 엔진
+// 💡 '메모'뿐만 아니라 '댓글(Comment)'까지 완벽하게 차단하는 수정된 함수
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
 
     for (const fileName of Object.keys(zip.files)) {
-      if (zip.files[fileName].dir) continue;
+      if (zip.files[fileName].dir || !fileName.toLowerCase().endsWith('.xml')) continue;
+
+      // 1. 파일명에 메모(memo)나 댓글(comment)이 포함된 전용 파일이 있으면 즉시 차단
       const lowerName = fileName.toLowerCase();
-      if (!lowerName.endsWith('.xml')) continue;
-      
-      // 1. 순수 서식/설정 파일은 검사 제외 (오진 방지)
-      if (lowerName.includes('header.xml') || lowerName.includes('settings.xml') || lowerName.includes('version.xml')) {
-        continue;
+      if ((lowerName.includes('memo') || lowerName.includes('comment')) && !lowerName.includes('header')) {
+        return true;
       }
 
       const xmlText = await zip.files[fileName].async('string');
       
-      // 2. 메모 전용 파일 (예: memoExtended.xml, comments.xml) 검사
-      // 한글은 메모가 없어도 빈 껍데기 파일을 생성하므로, XML 태그를 모두 벗겨내고 순수 '텍스트'가 남는지 확인
-      if (lowerName.includes('memo') || lowerName.includes('comment')) {
-        const pureText = xmlText.replace(/<[^>]+>/g, '').trim();
-        if (pureText.length > 0) return true; // 실제 작성된 메모 내용이 발견됨!
-        continue; // 텍스트가 없는 빈 껍데기면 무시하고 다음 파일 검사
-      }
+      // 2. 오진 방지: 문서 기본 서식인 memoShape, memoPr 태그를 문자열에서 임시로 삭제
+      const safeXml = xmlText.replace(/<\/?(?:[\w\-]+:)?memo(shape|pr)[^>]*>/gi, '').toLowerCase();
 
-      // 3. 본문 파일 (section*.xml) 내부의 메모/덧말/댓글 인라인 태그 스캔
-      const lowerXml = xmlText.toLowerCase();
-      
-      // 서식 단어인 'memoshape' 문자열을 텍스트에서 완전히 제거
-      const withoutShape = lowerXml.split('memoshape').join('');
-      
-      // 서식이 제거된 텍스트에 아래 태그 중 하나라도 발견되면 100% 메모/댓글
-      if (
-        withoutShape.includes('<hp:memo') || 
-        withoutShape.includes('</hp:memo') || 
-        withoutShape.includes('<memo') || 
-        withoutShape.includes('</memo') ||
-        withoutShape.includes('<hp:comment') ||
-        withoutShape.includes('<comment') ||
-        withoutShape.includes('<hp:dutmal') ||
-        withoutShape.includes('<dutmal')
-      ) {
-        return true;
+      // 3. 실제 '메모'와 '댓글' 태그(<, </ 형태)가 하나라도 본문에 남아있는지 스캔
+      // 사용자가 문서 본문에 직접 타건한 "<댓글>" 글자는 XML에서 "&lt;댓글&gt;"로 치환되므로 텍스트 오진 우려 없음
+      const targetTags = [
+        '<hp:memo', '<memo', '</hp:memo', '</memo',
+        '<hp:comment', '<comment', '</hp:comment', '</comment',
+        '<hc:comment', '</hc:comment',
+        '<hp:reply', '<reply', '</hp:reply', '</reply'
+      ];
+
+      if (targetTags.some(tag => safeXml.includes(tag))) {
+        return true; // 메모나 댓글 발견 시 즉시 업로드 차단
       }
     }
     return false;
   } catch (error) {
-    console.error("메모 스캔 오류:", error);
-    // 💡 에러 발생 시 무사통과 방지 (Fail-Closed)
-    throw error; 
+    console.error("파일 스캔 오류:", error);
+    throw error; // 검사 중 브라우저가 뻗으면 무사통과되지 않도록 강제 차단 (Fail-Closed)
   }
 };
 
