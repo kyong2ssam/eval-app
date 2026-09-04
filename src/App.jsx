@@ -16,31 +16,36 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
+// 💡 버전 및 접두사 변형에 구애받지 않는 최후의 정밀 메모 감지 함수
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
-    
+
+    // memo, memoRef, memoList, memoExtended 등 실제 메모 태그만 조준 (memoShape/memoPr 등 서식 제외)
+    const memoTagRegex = /<(?:[\w\-]+:)?memo(ref|list|extended|\b)(?=[\s/>])/i;
+
     for (const relativePath of Object.keys(zip.files)) {
       const lowerPath = relativePath.toLowerCase();
 
-      // 1. 최신 한글 메모 파일(memoExtended.xml 등) 정밀 체크
-      if (lowerPath.includes('memo') && lowerPath.endsWith('.xml') && !lowerPath.includes('header')) {
-        const memoXml = await zip.files[relativePath].async('string');
-        if (memoXml.length > 50) return true;
+      // 1. 파일명 자체가 메모 관련 파일인 경우 (header.xml 서식 파일 제외)
+      if (lowerPath.includes('memo') && !lowerPath.includes('header')) {
+        return true;
       }
 
-      // 2. 본문(section*.xml) 내 메모 참조 태그 스캔 (<hp:memo>, <hp:memoRef> 등)
-      if (!zip.files[relativePath].dir && lowerPath.includes('section') && lowerPath.endsWith('.xml')) {
+      // 2. ZIP 내 모든 XML 파일 내부 검색 (서식 용도의 header.xml 제외)
+      if (!zip.files[relativePath].dir && lowerPath.endsWith('.xml') && !lowerPath.includes('header.xml')) {
         const xmlText = await zip.files[relativePath].async('string');
-        if (/<hp:memo(Ref|\b)/i.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
-          return true;
+
+        // 실제 메모 태그나 덧말이 존재하는지 검사
+        if (memoTagRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
+          return true; // 메모 발견 시 즉시 차단
         }
       }
     }
-    return false;
+    return false; // 메모가 없는 클린 파일
   } catch (error) {
-    console.error("메모 검사 오류:", error);
+    console.error("메모 스캔 오류:", error);
     return false;
   }
 };
