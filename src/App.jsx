@@ -335,7 +335,7 @@ if (hasMemo) {
   if (isLoadingConfig) return <div className="min-h-screen bg-zinc-100 flex items-center justify-center font-bold text-zinc-500">서버 연결 및 시스템 설정 불러오는 중...</div>;
 
   return (
-    <div onContextMenu={(e) => e.preventDefault()} className="min-h-screen bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6 flex flex-col relative">
+    <div onContextMenu={(e) => e.preventDefault()} className="h-screen overflow-hidden bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6 flex flex-col relative">
       {popup.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-zinc-200 text-center animate-in fade-in zoom-in duration-200">
@@ -378,7 +378,7 @@ if (hasMemo) {
         </div>
       )}
 
-      <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden flex-1">
+      <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden flex-1 flex flex-col">
         <div className="p-6 sm:p-8 border-b border-zinc-200 bg-zinc-900 text-white flex justify-between items-center">
           <div>
             <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{termInfo.year}학년도 {termInfo.semester}</span>
@@ -393,7 +393,7 @@ if (hasMemo) {
           <button onClick={() => setActiveTab('admin')} className={`py-4 px-2 text-sm font-bold cursor-pointer border-b-2 ${activeTab === 'admin' ? 'border-zinc-900 text-zinc-900' : 'border-transparent text-zinc-500 hover:text-zinc-800'}`}>03. 관리자 전용</button>
         </div>
 
-        <div className="p-6 sm:p-8 bg-white">
+        <div className="p-6 sm:p-8 bg-white flex-1 overflow-y-auto flex flex-col">
           {activeTab === 'form' && (
             <div className="max-w-5xl mx-auto">
               <div className="flex justify-between items-end mb-8">
@@ -463,7 +463,7 @@ if (hasMemo) {
           )}
 
           {activeTab === 'sheet' && (
-            <div className="w-full h-[75vh] min-h-[650px] border border-zinc-300 rounded-xl overflow-hidden bg-zinc-50 flex items-center justify-center">
+            <div className="w-full flex-1 min-h-0 border border-zinc-300 rounded-xl overflow-hidden bg-zinc-50 flex items-center justify-center">
               {globalSheetUrl ? <iframe src={globalSheetUrl} className="w-full h-full border-0" title="시트" /> : 
                 <div className="text-center"><span className="text-4xl mb-4 block">📊</span><p className="text-zinc-500 font-bold text-sm">관리자 메뉴에서 구글 시트 주소를 먼저 설정해 주세요.</p></div>}
             </div>
@@ -565,8 +565,8 @@ if (hasMemo) {
                                   <td className="py-3 px-4 text-xs text-zinc-600 font-bold">{file.path.split(' > ').map(stripNumber).join(' > ')}</td>
                                   <td className="py-3 px-4 font-bold text-zinc-900">{file.name}</td>
                                   <td className="py-3 px-4 flex justify-center gap-2">
-                                    <a href={file.downloadUrl} className="text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold cursor-pointer">저장</a>
-<button onClick={() => handleDeleteFile(file.id, file.name)} className="text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold cursor-pointer">삭제</button>
+                                    <a href={file.downloadUrl} className="inline-flex items-center justify-center border border-transparent text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold cursor-pointer">저장</a>
+<button onClick={() => handleDeleteFile(file.id, file.name)} className="inline-flex items-center justify-center text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold cursor-pointer">삭제</button>
                                   </td>
                                 </tr>
                               ))
