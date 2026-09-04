@@ -390,7 +390,7 @@ if (hasMemo) {
 
         <div className="p-6 sm:p-8 bg-white flex-1 overflow-y-auto flex flex-col">
           {activeTab === 'form' && (
-            <div className="max-w-5xl mx-auto">
+            <div className="w-full lg:w-2/3 max-w-4xl mx-auto">
               <div className="flex justify-between items-end mb-8">
                 <h2 className="text-2xl font-black text-zinc-900">평가계획 파일 제출</h2>
                 <button type="button" onClick={handleOpenMyFiles} className="bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-zinc-700 font-bold px-4 py-2 rounded-lg text-sm cursor-pointer">👀 내가 제출한 파일 확인</button>
@@ -434,7 +434,7 @@ if (hasMemo) {
                       <div className="flex flex-col items-center w-full animate-in fade-in zoom-in duration-200">
                         <label htmlFor="file-upload" className="cursor-pointer mb-4"><span className="text-4xl hover:scale-110 transition-transform block">📄</span></label>
                         <div className="flex items-center gap-4 bg-zinc-100 px-5 py-3 rounded-xl border border-zinc-200 shadow-sm">
-                          <span className="text-base font-bold text-zinc-900">{formData.file.name}</span>
+                          <span className="text-base font-bold text-zinc-900 break-all">{formData.file.name}</span>
                           <button type="button" onClick={(e) => { e.preventDefault(); setFormData({ ...formData, file: null }); document.getElementById('file-upload').value = ''; }} className="bg-white hover:bg-zinc-200 text-zinc-400 hover:text-zinc-900 rounded-full shadow-sm border border-zinc-200 w-8 h-8 flex items-center justify-center cursor-pointer transition-colors duration-200">
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
