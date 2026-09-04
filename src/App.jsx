@@ -16,34 +16,35 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 메모(본문 주석)만 정확하게 100% 탐지하는 정밀 스캔 함수
+// 💡 한글(HWPX)의 모든 메모/댓글 태그만 정밀하게 100% 탐지하는 함수
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
 
-    // <hp:memo>, <hp:memoRef>, <memo>, <memoRef> 태그만 탐지 (memoShape/memoPr 서식 제외)
-    const memoTagRegex = /<(?:[\w\-]+:)?memo(ref)?[\s/>]/i;
+    // <...memoShape> 서식만 제외하고, <hp:memo... 로 시작하는 모든 본문 메모 태그 탐지
+    const realMemoRegex = /<(?:[\w\-]+:)?memo(?!shape)/i;
 
     for (const fileName of Object.keys(zip.files)) {
       const lowerName = fileName.toLowerCase();
 
-      // 1. 최신 한글 방식: HWPX 압축 내에 memoExtended.xml 등 메모 전용 파일이 존재하는 경우
+      // 1. 최신 한글 방식: 압축 내 memoExtended.xml 등 메모 전용 파일 존재 시
       if (lowerName.includes('memo') && !lowerName.includes('header')) {
         return true;
       }
 
-      // 2. 본문(section*.xml) 파일 내 메모 및 덧말 태그 검사
+      // 2. 본문(section*.xml) 내 메모 및 덧말 태그 스캔
       if (lowerName.includes('section') && lowerName.endsWith('.xml')) {
         const xmlText = await zip.files[fileName].async('string');
-        if (memoTagRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
+        
+        if (realMemoRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
           return true; // 메모 발견 시 차단
         }
       }
     }
     return false; // 메모 없음
   } catch (error) {
-    console.error("메모 검사 오류:", error);
+    console.error("메모 스캔 중 오류 발생:", error);
     return false;
   }
 };
