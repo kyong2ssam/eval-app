@@ -16,7 +16,7 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 선생님께서 찾아주신 필드형 메모(type="MEMO") 패턴을 완벽히 차단하는 함수
+// 💡 checkHwpxMemos 함수 (본문 section 파일만 정밀 타겟팅)
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -26,18 +26,13 @@ const checkHwpxMemos = async (file) => {
       if (zip.files[fileName].dir) continue;
       
       const lowerName = fileName.toLowerCase();
-      
-      // 1. 메모 관련 파일명 차단
-      if (/(memo|comment|reply|annotation)/.test(lowerName) && !lowerName.includes('header')) {
-        return true;
-      }
 
-      // 2. 본문 XML 정밀 스캔
-      if (lowerName.endsWith('.xml') && !['header', 'settings', 'version'].some(ex => lowerName.includes(ex))) {
+      // 🚨 핵심 수정: 이름에 'section'이 포함된 실제 본문 XML 파일만 검사
+      // (눈에 안 보이는 잔여 memo.xml, comment.xml 찌꺼기 파일은 스캔 패스)
+      if (lowerName.includes('section') && lowerName.endsWith('.xml')) {
         const xmlText = await zip.files[fileName].async('string');
         const lowerXml = xmlText.toLowerCase();
 
-        // 선생님께서 찾아주신 패턴: type="MEMO", Command="MEMO" 등 필드에 숨겨진 메모 정확히 조준
         if (
           lowerXml.includes('type="memo"') || 
           lowerXml.includes('command">memo') ||
@@ -54,7 +49,7 @@ const checkHwpxMemos = async (file) => {
     return false;
   } catch (error) {
     console.error("파일 스캔 오류:", error);
-    return true; // 오류 발생 시 강제 차단
+    return true; 
   }
 };
 
