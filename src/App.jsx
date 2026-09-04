@@ -69,7 +69,7 @@ export default function App() {
 
   const [inputPassword, setInputPassword] = useState('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  cconst [submittedFiles, setSubmittedFiles] = useState([]);
+  const [submittedFiles, setSubmittedFiles] = useState([]);
   const [filterCategory, setFilterCategory] = useState('전체');
   const [filterGrade, setFilterGrade] = useState('전체');
   const [filterDept, setFilterDept] = useState('전체');
@@ -556,16 +556,18 @@ if (hasMemo) {
                         {/* 💡 다중 필터 드롭다운 UI */}
                         <div className="flex flex-wrap gap-2 items-center">
                           <span className="text-xs font-black text-zinc-600 ml-1 mr-2">📌 목록 필터링</span>
-                          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
-                            <option value="전체">모든 교과</option><option value="보통교과">보통교과</option><option value="전문교과">전문교과</option><option value="학점제">학점제</option><option value="꿈두레">꿈두레</option>
-                          </select>
-                          <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
-                            <option value="전체">모든 학년</option><option value="1학년">1학년</option><option value="2학년">2학년</option><option value="3학년">3학년</option>
-                          </select>
-                          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
-                            <option value="전체">모든 학과</option>
-                            {DEPARTMENTS.map(dept => <option key={dept} value={stripNumber(dept)}>{stripNumber(dept)}</option>)}
-                          </select>
+                          <select value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); if(e.target.value !== '전문교과') setFilterDept('전체'); }} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
+  <option value="전체">모든 교과</option><option value="보통교과">보통교과</option><option value="전문교과">전문교과</option><option value="학점제">학점제</option><option value="꿈두레">꿈두레</option>
+</select>
+<select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
+  <option value="전체">모든 학년</option><option value="1학년">1학년</option><option value="2학년">2학년</option><option value="3학년">3학년</option>
+</select>
+{filterCategory === '전문교과' && (
+  <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer animate-in fade-in zoom-in duration-200">
+    <option value="전체">모든 학과</option>
+    {DEPARTMENTS.map(dept => <option key={dept} value={stripNumber(dept)}>{stripNumber(dept)}</option>)}
+  </select>
+)}
                         </div>
                       </div>
                       {/* 💡 리스트 초압축 (상하 패딩을 py-1로 극한 축소) */}
