@@ -16,6 +16,43 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
+// 💡 서식(<hp:memoShape>)은 건너뛰고 실제 메모만 100% 탐지하는 완벽한 정밀 엔진
+const checkHwpxMemos = async (file) => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    
+    // 메모 태그 정밀 정규식: <hp:memo >, <hp:memo>, <hp:memo/>, <hp:memoRef ... 등을 모두 탐지
+    // 뒤에 'Shape'나 'Pr' 같은 서식 단어가 붙은 경우는 제외함
+    const realMemoTagRegex = /<(?:hp:)?memo[\s/>]/i;
+    const realMemoRefRegex = /<(?:hp:)?memoRef[\s/>]/i;
+
+    for (const relativePath of Object.keys(zip.files)) {
+      const lowerPath = relativePath.toLowerCase();
+
+      // 1. 최신 한글 메모 전용 파일(memoExtended.xml 등) 스캔
+      if (lowerPath.includes('memo') && lowerPath.endsWith('.xml') && !lowerPath.includes('header')) {
+        const memoXml = await zip.files[relativePath].async('string');
+        if (realMemoTagRegex.test(memoXml) || realMemoRefRegex.test(memoXml)) {
+          return true;
+        }
+      }
+
+      // 2. 본문(section*.xml) 및 기타 모든 XML 파일 내 실제 메모 스캔
+      if (!zip.files[relativePath].dir && lowerPath.endsWith('.xml')) {
+        const xmlText = await zip.files[relativePath].async('string');
+        if (realMemoTagRegex.test(xmlText) || realMemoRefRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
+          return true;
+        }
+      }
+    }
+    return false; // 메모가 전혀 없는 완벽한 깨끗한 파일
+  } catch (error) {
+    console.error("메모 검사 오류 발생:", error);
+    return false;
+  }
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('form');
   const [adminSubTab, setAdminSubTab] = useState('status'); 
@@ -202,38 +239,25 @@ export default function App() {
   };
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, file: e.target.files[0] })); };
 
-  // 💡 선생님의 완벽한 원본 코드가 이식된 제출 함수
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!gasUrl) return showPopup('error', '서버 연결 실패', '마스터 시트의 주소를 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.');
     if (!formData.file) return showPopup('error', '파일 누락', '평가계획(.hwpx) 파일을 첨부해 주세요.');
 
-    // 🚨 1. 파일 속 메모 존재 여부 검사 (가장 먼저 실행)
+    setIsSubmitting(true);
+
     try {
-      setIsSubmitting(true);
-      const zip = new JSZip(); // 👈 여기서 hwpX 파일을 열어봅니다.
-      const loadedZip = await zip.loadAsync(formData.file);
-      let hasMemo = false;
-
-      // hwpx 압축 속의 xml 파일들을 뒤져서 메모 태그(<hp:memo) 찾기
-      for (const relativePath in loadedZip.files) {
-        if (relativePath.endsWith('.xml')) {
-          const content = await loadedZip.file(relativePath).async('string');
-          // 💡 파일 내용 중에 메모 태그가 하나라도 있는지 검사! (선생님 코드 100% 동일 적용)
-          if (content.includes('<hp:memo') || content.includes('</hp:memo>')) {
-            hasMemo = true;
-            break;
-          }
-        }
-      }
-
+      const hasMemo = await checkHwpxMemos(formData.file);
       if (hasMemo) {
         setIsSubmitting(false);
-        // 💡 메모가 발견되면 서버로 안 보내고 여기서 바로 차단 후 선생님의 경고창을 띄웁니다!
-        return showPopup('error', '메모 삭제 요망 🚨', '파일 내에 [메모]가 남아있습니다.\n\n한글 프로그램 상단의 [검토] 탭에서 "메모 모두 지우기"를 클릭하여 지운 후, 다시 저장해서 제출해 주세요!');
+        return showPopup(
+          'error', 
+          '메모 삭제 요망 🚨', 
+          '파일 내에 [메모]가 남아있습니다.\n\n한글 프로그램 상단의 [검토] 탭에서 "메모 모두 지우기"를 클릭하여 지운 후, 다시 저장해서 제출해 주세요!'
+        );
       }
     } catch (err) {
-      console.error("메모 검사 중 오류 발생:", err);
+      console.error("메모 검사 오류 발생:", err);
     }
 
     let expectedParts = [`${termInfo.year}학년도`, termInfo.semester];
@@ -422,7 +446,7 @@ export default function App() {
                   </div>
                 </div>
                 <button type="submit" disabled={isSubmitting} className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:bg-zinc-400 text-white font-bold text-lg py-5 rounded-2xl shadow-md cursor-pointer">
-                  {isSubmitting ? '파일 검사 및 업로드 중...' : '제출 완료하기'}
+                  {isSubmitting ? '메모 검사 및 업로드 중...' : '제출 완료하기'}
                 </button>
               </form>
             </div>
