@@ -261,8 +261,8 @@ if (hasMemo) {
   setIsSubmitting(false);
   return showPopup(
     'error', 
-    '메모 삭제 요망 🚨', 
-    '파일 내에 [메모] 또는 [댓글]이 남아있습니다.\n\n한글 프로그램 상단의 [편집] ➔ [조판 부호 지우기] 메뉴에서 "메모"를 체크하여 모두 삭제한 뒤, 다시 저장해서 제출해 주세요!'
+    '메모 삭제 필요 🚨', 
+    '파일 내에 [메모]가 남아있습니다.\n\n한글 프로그램 상단의 [편집] ➔ [조판 부호 지우기] 메뉴에서 "메모"를 체크하여 모두 삭제한 뒤, 다시 저장해서 제출해 주세요!'
   );
 }
     } catch (err) {
@@ -565,8 +565,8 @@ if (hasMemo) {
                                   <td className="py-3 px-4 text-xs text-zinc-600 font-bold">{file.path.split(' > ').map(stripNumber).join(' > ')}</td>
                                   <td className="py-3 px-4 font-bold text-zinc-900">{file.name}</td>
                                   <td className="py-3 px-4 flex justify-center gap-2">
-                                    <a href={file.downloadUrl} className="text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold cursor-pointer">저장</a>
-                                    <button onClick={() => handleDeleteFile(file.id, file.name)} className="text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold cursor-pointer">삭제</button>
+                                    <a href={file.downloadUrl} className="inline-flex items-center justify-center border border-transparent text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold cursor-pointer">저장</a>
+<button onClick={() => handleDeleteFile(file.id, file.name)} className="inline-flex items-center justify-center text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold cursor-pointer">삭제</button>
                                   </td>
                                 </tr>
                               ))
