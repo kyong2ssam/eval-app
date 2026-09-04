@@ -255,14 +255,16 @@ export default function App() {
     // 🚨 파일 검사 중 에러가 나더라도 무사통과되지 않도록 차단 (Fail-Closed)
     try {
       const hasMemo = await checkHwpxMemos(formData.file);
-      if (hasMemo) {
-        setIsSubmitting(false);
-        return showPopup(
-          'error', 
-          '메모 삭제 요망 🚨', 
-          '파일 내에 [메모] 또는 [댓글]이 남아있습니다.\n\n한글 프로그램 상단의 [검토] 탭에서 "메모 모두 지우기"를 클릭하여 지운 후, 다시 저장해서 제출해 주세요!'
-        );
-      }
+// 💡 알림창 메시지 교체 (handleSubmit 함수 내부)
+
+if (hasMemo) {
+  setIsSubmitting(false);
+  return showPopup(
+    'error', 
+    '메모 삭제 요망 🚨', 
+    '파일 내에 [메모] 또는 [댓글]이 남아있습니다.\n\n한글 프로그램 상단의 [편집] ➔ [조판 부호 지우기] 메뉴에서 "메모"를 체크하여 모두 삭제한 뒤, 다시 저장해서 제출해 주세요!'
+  );
+}
     } catch (err) {
       setIsSubmitting(false);
       return showPopup('error', '파일 검사 실패 🚨', '파일 분석 중 오류가 발생했습니다. 파일 용량이 너무 크거나 손상되었는지 확인해 주세요.');
