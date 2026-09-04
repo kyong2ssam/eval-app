@@ -69,7 +69,18 @@ export default function App() {
 
   const [inputPassword, setInputPassword] = useState('');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [submittedFiles, setSubmittedFiles] = useState([]);
+  cconst [submittedFiles, setSubmittedFiles] = useState([]);
+  const [filterCategory, setFilterCategory] = useState('전체');
+  const [filterGrade, setFilterGrade] = useState('전체');
+  const [filterDept, setFilterDept] = useState('전체');
+
+  // 선택된 필터 조건에 맞게 제출된 파일을 걸러주는 로직
+  const filteredSubmittedFiles = submittedFiles.filter(file => {
+    if (filterCategory !== '전체' && !file.path.includes(filterCategory)) return false;
+    if (filterGrade !== '전체' && !file.path.includes(filterGrade)) return false;
+    if (filterDept !== '전체' && !file.path.includes(filterDept)) return false;
+    return true;
+  });
   const [selectedFileIds, setSelectedFileIds] = useState([]); 
   const [isZipping, setIsZipping] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -523,45 +534,62 @@ if (hasMemo) {
                   )}
 
                   {adminSubTab === 'files' && (
-                    <div className="bg-white border border-zinc-300 rounded-xl overflow-hidden">
-                      <div className="bg-zinc-100 p-4 border-b border-zinc-300 flex flex-wrap justify-between items-center gap-4">
-                        <div className="flex items-center space-x-2">
-                          <select value={adminQuery.year} onChange={(e) => setAdminQuery({...adminQuery, year: e.target.value})} className="bg-white border border-zinc-300 rounded px-2 py-1 text-sm font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-900">
-                            {Array.from({ length: 10 }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
-                          </select>
-                          <span className="text-sm font-bold text-zinc-900">학년도</span>
-                          <select value={adminQuery.semester} onChange={(e) => setAdminQuery({...adminQuery, semester: e.target.value})} className="bg-white border border-zinc-300 rounded px-2 py-1 text-sm font-bold cursor-pointer">
-                            <option value="1학기">1학기</option><option value="2학기">2학기</option>
-                          </select>
-                          <button onClick={handleAdminSearch} className="bg-zinc-900 text-white px-4 py-1.5 rounded text-sm font-bold ml-2 cursor-pointer hover:bg-zinc-800">조회</button>
+                    <div className="bg-white border border-zinc-300 rounded-xl overflow-hidden flex flex-col h-[500px]">
+                      <div className="bg-zinc-100 p-3 border-b border-zinc-300 flex flex-col gap-3 shrink-0">
+                        <div className="flex flex-wrap justify-between items-center gap-3">
+                          <div className="flex items-center space-x-2">
+                            <select value={adminQuery.year} onChange={(e) => setAdminQuery({...adminQuery, year: e.target.value})} className="bg-white border border-zinc-300 rounded px-2 py-1 text-sm font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-zinc-900">
+                              {Array.from({ length: 10 }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                            <span className="text-sm font-bold text-zinc-900">학년도</span>
+                            <select value={adminQuery.semester} onChange={(e) => setAdminQuery({...adminQuery, semester: e.target.value})} className="bg-white border border-zinc-300 rounded px-2 py-1 text-sm font-bold cursor-pointer">
+                              <option value="1학기">1학기</option><option value="2학기">2학기</option>
+                            </select>
+                            <button onClick={handleAdminSearch} className="bg-zinc-900 text-white px-3 py-1.5 rounded text-sm font-bold ml-2 cursor-pointer hover:bg-zinc-800">조회</button>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {selectedFileIds.length > 0 && <button onClick={handleDeleteSelected} className="bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded text-sm font-bold cursor-pointer">선택 삭제 ({selectedFileIds.length})</button>}
+                            {filteredSubmittedFiles.length > 0 && <button onClick={handleDeleteAll} className="bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-200 px-3 py-1.5 rounded text-sm font-bold cursor-pointer">전체 삭제</button>}
+                            <button onClick={handleZipDownload} disabled={isZipping} className="bg-white border-2 border-zinc-900 text-zinc-900 hover:bg-zinc-900 hover:text-white px-3 py-1.5 rounded text-sm font-bold cursor-pointer">{isZipping ? "압축 중..." : "전체 ZIP 다운로드"}</button>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          {selectedFileIds.length > 0 && <button onClick={handleDeleteSelected} className="bg-zinc-900 text-white hover:bg-zinc-800 px-3.5 py-1.5 rounded text-sm font-bold cursor-pointer">선택 삭제 ({selectedFileIds.length})</button>}
-                          {submittedFiles.length > 0 && <button onClick={handleDeleteAll} className="bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-200 px-3.5 py-1.5 rounded text-sm font-bold cursor-pointer">전체 삭제</button>}
-                          <button onClick={handleZipDownload} disabled={isZipping} className="bg-white border-2 border-zinc-900 text-zinc-900 hover:bg-zinc-900 hover:text-white px-4 py-1.5 rounded text-sm font-bold cursor-pointer">{isZipping ? "압축 중..." : "전체 압축(ZIP) 다운로드"}</button>
+                        {/* 💡 다중 필터 드롭다운 UI */}
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <span className="text-xs font-black text-zinc-600 ml-1 mr-2">📌 목록 필터링</span>
+                          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
+                            <option value="전체">모든 교과</option><option value="보통교과">보통교과</option><option value="전문교과">전문교과</option><option value="학점제">학점제</option><option value="꿈두레">꿈두레</option>
+                          </select>
+                          <select value={filterGrade} onChange={(e) => setFilterGrade(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
+                            <option value="전체">모든 학년</option><option value="1학년">1학년</option><option value="2학년">2학년</option><option value="3학년">3학년</option>
+                          </select>
+                          <select value={filterDept} onChange={(e) => setFilterDept(e.target.value)} className="bg-white border border-zinc-300 rounded px-2 py-1 text-xs font-bold cursor-pointer">
+                            <option value="전체">모든 학과</option>
+                            {DEPARTMENTS.map(dept => <option key={dept} value={stripNumber(dept)}>{stripNumber(dept)}</option>)}
+                          </select>
                         </div>
                       </div>
-                      <div className="overflow-x-auto h-[500px]">
-                        <table className="w-full text-left text-sm border-collapse">
-                          <thead className="sticky top-0 bg-white border-b-2 border-zinc-900 text-zinc-900 z-10">
+                      {/* 💡 리스트 초압축 (상하 패딩을 py-1로 극한 축소) */}
+                      <div className="overflow-x-auto overflow-y-auto flex-1 bg-white">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead className="sticky top-0 bg-white border-b-2 border-zinc-900 text-zinc-900 z-10 shadow-sm">
                             <tr>
-                              <th className="py-3 px-4 w-12 text-center"><input type="checkbox" onChange={handleSelectAll} checked={submittedFiles.length > 0 && selectedFileIds.length === submittedFiles.length} className="w-4 h-4 cursor-pointer" /></th>
-                              <th className="py-3 px-4 font-black">분류 (폴더)</th>
-                              <th className="py-3 px-4 font-black">파일명</th>
-                              <th className="py-3 px-4 font-black w-32 text-center">관리</th>
+                              <th className="py-1.5 px-3 w-10 text-center"><input type="checkbox" onChange={(e) => setSelectedFileIds(e.target.checked ? filteredSubmittedFiles.map(f => f.id) : [])} checked={filteredSubmittedFiles.length > 0 && selectedFileIds.length === filteredSubmittedFiles.length} className="w-3.5 h-3.5 cursor-pointer" /></th>
+                              <th className="py-1.5 px-3 font-black">분류 (폴더)</th>
+                              <th className="py-1.5 px-3 font-black">파일명</th>
+                              <th className="py-1.5 px-3 font-black w-28 text-center">관리</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-zinc-200">
-                            {isFetchingFiles ? <tr><td colSpan="4" className="py-12 text-center text-zinc-500 font-bold">로딩 중...</td></tr> : 
-                             submittedFiles.length === 0 ? <tr><td colSpan="4" className="py-12 text-center text-zinc-500 font-bold">조회된 파일이 없습니다.</td></tr> : (
-                              submittedFiles.map(file => (
+                            {isFetchingFiles ? <tr><td colSpan="4" className="py-6 text-center text-zinc-500 font-bold">로딩 중...</td></tr> : 
+                             filteredSubmittedFiles.length === 0 ? <tr><td colSpan="4" className="py-6 text-center text-zinc-500 font-bold">조건에 맞는 파일이 없습니다.</td></tr> : (
+                              filteredSubmittedFiles.map(file => (
                                 <tr key={file.id} className="hover:bg-zinc-50">
-                                  <td className="py-3 px-4 text-center"><input type="checkbox" checked={selectedFileIds.includes(file.id)} onChange={() => handleSelectOne(file.id)} className="w-4 h-4 cursor-pointer" /></td>
-                                  <td className="py-3 px-4 text-xs text-zinc-600 font-bold">{file.path.split(' > ').map(stripNumber).join(' > ')}</td>
-                                  <td className="py-3 px-4 font-bold text-zinc-900">{file.name}</td>
-                                 <td className="py-3 px-4 flex justify-center gap-2">
-                                    <a href={file.downloadUrl.replace(/\/file\/d\/([^\/]+)\/?.*/, '/uc?export=download&id=$1')} target="_blank" rel="noopener noreferrer" download={file.name} className="inline-flex items-center justify-center border border-transparent text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold cursor-pointer whitespace-nowrap">저장</a>
-                                    <button onClick={() => handleDeleteFile(file.id, file.name)} className="inline-flex items-center justify-center text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold cursor-pointer whitespace-nowrap">삭제</button>
+                                  <td className="py-1 px-3 text-center"><input type="checkbox" checked={selectedFileIds.includes(file.id)} onChange={() => handleSelectOne(file.id)} className="w-3.5 h-3.5 cursor-pointer" /></td>
+                                  <td className="py-1 px-3 text-[11px] text-zinc-500 font-bold whitespace-nowrap">{file.path.split(' > ').map(stripNumber).join(' > ')}</td>
+                                  <td className="py-1 px-3 font-bold text-zinc-900 text-[11px]">{file.name}</td>
+                                  <td className="py-1 px-3 flex justify-center gap-1.5">
+                                    <a href={file.downloadUrl.replace(/\/file\/d\/([^\/]+)\/?.*/, '/uc?export=download&id=$1')} target="_blank" rel="noopener noreferrer" download={file.name} className="inline-flex items-center justify-center border border-transparent text-[10px] bg-zinc-900 text-white hover:bg-zinc-800 px-2.5 py-1 rounded font-bold cursor-pointer whitespace-nowrap">저장</a>
+                                    <button onClick={() => handleDeleteFile(file.id, file.name)} className="inline-flex items-center justify-center text-[10px] bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-2.5 py-1 rounded font-bold cursor-pointer whitespace-nowrap">삭제</button>
                                   </td>
                                 </tr>
                               ))
