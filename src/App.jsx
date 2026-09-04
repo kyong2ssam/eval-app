@@ -16,36 +16,57 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 한글(HWPX)의 모든 메모/댓글 태그만 정밀하게 100% 탐지하는 함수
+// 💡 대용량 파일에서도 뻗지 않고 100% 탐지하는 문자열 기반 메모 스캔 엔진
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
 
-    // <...memoShape> 서식만 제외하고, <hp:memo... 로 시작하는 모든 본문 메모 태그 탐지
-    const realMemoRegex = /<(?:[\w\-]+:)?memo(?!shape)/i;
-
     for (const fileName of Object.keys(zip.files)) {
+      if (zip.files[fileName].dir) continue;
       const lowerName = fileName.toLowerCase();
+      if (!lowerName.endsWith('.xml')) continue;
+      
+      // 1. 순수 서식/설정 파일은 검사 제외 (오진 방지)
+      if (lowerName.includes('header.xml') || lowerName.includes('settings.xml') || lowerName.includes('version.xml')) {
+        continue;
+      }
 
-      // 1. 최신 한글 방식: 압축 내 memoExtended.xml 등 메모 전용 파일 존재 시
-      if (lowerName.includes('memo') && !lowerName.includes('header')) {
+      const xmlText = await zip.files[fileName].async('string');
+      
+      // 2. 메모 전용 파일 (예: memoExtended.xml, comments.xml) 검사
+      // 한글은 메모가 없어도 빈 껍데기 파일을 생성하므로, XML 태그를 모두 벗겨내고 순수 '텍스트'가 남는지 확인
+      if (lowerName.includes('memo') || lowerName.includes('comment')) {
+        const pureText = xmlText.replace(/<[^>]+>/g, '').trim();
+        if (pureText.length > 0) return true; // 실제 작성된 메모 내용이 발견됨!
+        continue; // 텍스트가 없는 빈 껍데기면 무시하고 다음 파일 검사
+      }
+
+      // 3. 본문 파일 (section*.xml) 내부의 메모/덧말/댓글 인라인 태그 스캔
+      const lowerXml = xmlText.toLowerCase();
+      
+      // 서식 단어인 'memoshape' 문자열을 텍스트에서 완전히 제거
+      const withoutShape = lowerXml.split('memoshape').join('');
+      
+      // 서식이 제거된 텍스트에 아래 태그 중 하나라도 발견되면 100% 메모/댓글
+      if (
+        withoutShape.includes('<hp:memo') || 
+        withoutShape.includes('</hp:memo') || 
+        withoutShape.includes('<memo') || 
+        withoutShape.includes('</memo') ||
+        withoutShape.includes('<hp:comment') ||
+        withoutShape.includes('<comment') ||
+        withoutShape.includes('<hp:dutmal') ||
+        withoutShape.includes('<dutmal')
+      ) {
         return true;
       }
-
-      // 2. 본문(section*.xml) 내 메모 및 덧말 태그 스캔
-      if (lowerName.includes('section') && lowerName.endsWith('.xml')) {
-        const xmlText = await zip.files[fileName].async('string');
-        
-        if (realMemoRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
-          return true; // 메모 발견 시 차단
-        }
-      }
     }
-    return false; // 메모 없음
-  } catch (error) {
-    console.error("메모 스캔 중 오류 발생:", error);
     return false;
+  } catch (error) {
+    console.error("메모 스캔 오류:", error);
+    // 💡 에러 발생 시 무사통과 방지 (Fail-Closed)
+    throw error; 
   }
 };
 
@@ -235,6 +256,7 @@ export default function App() {
   };
   const handleFileChange = (e) => { if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, file: e.target.files[0] })); };
 
+  // 💡 업로드 차단 안전장치가 적용된 제출 함수
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!gasUrl) return showPopup('error', '서버 연결 실패', '마스터 시트의 주소를 읽어오지 못했습니다. 잠시 후 다시 시도해 주세요.');
@@ -242,6 +264,7 @@ export default function App() {
 
     setIsSubmitting(true);
 
+    // 🚨 파일 검사 중 에러가 나더라도 무사통과되지 않도록 차단 (Fail-Closed)
     try {
       const hasMemo = await checkHwpxMemos(formData.file);
       if (hasMemo) {
@@ -249,11 +272,12 @@ export default function App() {
         return showPopup(
           'error', 
           '메모 삭제 요망 🚨', 
-          '파일 내에 [메모]가 남아있습니다.\n\n한글 프로그램 상단의 [검토] 탭에서 "메모 모두 지우기"를 클릭하여 지운 후, 다시 저장해서 제출해 주세요!'
+          '파일 내에 [메모] 또는 [댓글]이 남아있습니다.\n\n한글 프로그램 상단의 [검토] 탭에서 "메모 모두 지우기"를 클릭하여 지운 후, 다시 저장해서 제출해 주세요!'
         );
       }
     } catch (err) {
-      console.error("메모 검사 오류 발생:", err);
+      setIsSubmitting(false);
+      return showPopup('error', '파일 검사 실패 🚨', '파일 분석 중 오류가 발생했습니다. 파일 용량이 너무 크거나 손상되었는지 확인해 주세요.');
     }
 
     let expectedParts = [`${termInfo.year}학년도`, termInfo.semester];
