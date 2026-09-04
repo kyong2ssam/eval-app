@@ -565,8 +565,8 @@ if (hasMemo) {
                                   <td className="py-3 px-4 text-xs text-zinc-600 font-bold">{file.path.split(' > ').map(stripNumber).join(' > ')}</td>
                                   <td className="py-3 px-4 font-bold text-zinc-900">{file.name}</td>
                                   <td className="py-3 px-4 flex justify-center gap-2">
-                                    <a href={file.downloadUrl} className="inline-flex items-center justify-center border border-transparent text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 py-1.5 rounded font-bold cursor-pointer">저장</a>
-<button onClick={() => handleDeleteFile(file.id, file.name)} className="inline-flex items-center justify-center text-xs bg-white border border-zinc-900 text-zinc-900 hover:bg-zinc-200 px-3 py-1.5 rounded font-bold cursor-pointer">삭제</button>
+                                    <a href={file.downloadUrl} className="inline-flex items-center justify-center box-border h-8 leading-none border border-transparent text-xs bg-zinc-900 text-white hover:bg-zinc-800 px-3 rounded font-bold cursor-pointer">저장</a>
+<button onClick={() => handleDeleteFile(file.id, file.name)} className="inline-flex items-center justify-center box-border h-8 leading-none border border-zinc-900 text-xs bg-white text-zinc-900 hover:bg-zinc-200 px-3 rounded font-bold cursor-pointer">삭제</button>
                                   </td>
                                 </tr>
                               ))
