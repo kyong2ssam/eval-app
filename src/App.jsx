@@ -16,36 +16,34 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 버전 및 접두사 변형에 구애받지 않는 최후의 정밀 메모 감지 함수
+// 💡 메모(본문 주석)만 정확하게 100% 탐지하는 정밀 스캔 함수
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
 
-    // memo, memoRef, memoList, memoExtended 등 실제 메모 태그만 조준 (memoShape/memoPr 등 서식 제외)
-    const memoTagRegex = /<(?:[\w\-]+:)?memo(ref|list|extended|\b)(?=[\s/>])/i;
+    // <hp:memo>, <hp:memoRef>, <memo>, <memoRef> 태그만 탐지 (memoShape/memoPr 서식 제외)
+    const memoTagRegex = /<(?:[\w\-]+:)?memo(ref)?[\s/>]/i;
 
-    for (const relativePath of Object.keys(zip.files)) {
-      const lowerPath = relativePath.toLowerCase();
+    for (const fileName of Object.keys(zip.files)) {
+      const lowerName = fileName.toLowerCase();
 
-      // 1. 파일명 자체가 메모 관련 파일인 경우 (header.xml 서식 파일 제외)
-      if (lowerPath.includes('memo') && !lowerPath.includes('header')) {
+      // 1. 최신 한글 방식: HWPX 압축 내에 memoExtended.xml 등 메모 전용 파일이 존재하는 경우
+      if (lowerName.includes('memo') && !lowerName.includes('header')) {
         return true;
       }
 
-      // 2. ZIP 내 모든 XML 파일 내부 검색 (서식 용도의 header.xml 제외)
-      if (!zip.files[relativePath].dir && lowerPath.endsWith('.xml') && !lowerPath.includes('header.xml')) {
-        const xmlText = await zip.files[relativePath].async('string');
-
-        // 실제 메모 태그나 덧말이 존재하는지 검사
+      // 2. 본문(section*.xml) 파일 내 메모 및 덧말 태그 검사
+      if (lowerName.includes('section') && lowerName.endsWith('.xml')) {
+        const xmlText = await zip.files[fileName].async('string');
         if (memoTagRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
-          return true; // 메모 발견 시 즉시 차단
+          return true; // 메모 발견 시 차단
         }
       }
     }
-    return false; // 메모가 없는 클린 파일
+    return false; // 메모 없음
   } catch (error) {
-    console.error("메모 스캔 오류:", error);
+    console.error("메모 검사 오류:", error);
     return false;
   }
 };
