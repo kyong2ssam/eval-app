@@ -16,39 +16,31 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 서식(<hp:memoShape>)은 건너뛰고 실제 메모만 100% 탐지하는 완벽한 정밀 엔진
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
     
-    // 메모 태그 정밀 정규식: <hp:memo >, <hp:memo>, <hp:memo/>, <hp:memoRef ... 등을 모두 탐지
-    // 뒤에 'Shape'나 'Pr' 같은 서식 단어가 붙은 경우는 제외함
-    const realMemoTagRegex = /<(?:hp:)?memo[\s/>]/i;
-    const realMemoRefRegex = /<(?:hp:)?memoRef[\s/>]/i;
-
     for (const relativePath of Object.keys(zip.files)) {
       const lowerPath = relativePath.toLowerCase();
 
-      // 1. 최신 한글 메모 전용 파일(memoExtended.xml 등) 스캔
+      // 1. 최신 한글 메모 파일(memoExtended.xml 등) 정밀 체크
       if (lowerPath.includes('memo') && lowerPath.endsWith('.xml') && !lowerPath.includes('header')) {
         const memoXml = await zip.files[relativePath].async('string');
-        if (realMemoTagRegex.test(memoXml) || realMemoRefRegex.test(memoXml)) {
-          return true;
-        }
+        if (memoXml.length > 50) return true;
       }
 
-      // 2. 본문(section*.xml) 및 기타 모든 XML 파일 내 실제 메모 스캔
-      if (!zip.files[relativePath].dir && lowerPath.endsWith('.xml')) {
+      // 2. 본문(section*.xml) 내 메모 참조 태그 스캔 (<hp:memo>, <hp:memoRef> 등)
+      if (!zip.files[relativePath].dir && lowerPath.includes('section') && lowerPath.endsWith('.xml')) {
         const xmlText = await zip.files[relativePath].async('string');
-        if (realMemoTagRegex.test(xmlText) || realMemoRefRegex.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
+        if (/<hp:memo(Ref|\b)/i.test(xmlText) || xmlText.toLowerCase().includes('dutmal')) {
           return true;
         }
       }
     }
-    return false; // 메모가 전혀 없는 완벽한 깨끗한 파일
+    return false;
   } catch (error) {
-    console.error("메모 검사 오류 발생:", error);
+    console.error("메모 검사 오류:", error);
     return false;
   }
 };
