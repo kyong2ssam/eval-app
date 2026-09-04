@@ -16,43 +16,45 @@ const DEPARTMENTS = [
 ];
 const stripNumber = (str) => str ? str.replace(/^[0-9]+\.\s*/, '') : '';
 
-// 💡 '메모'뿐만 아니라 '댓글(Comment)'까지 완벽하게 차단하는 수정된 함수
+// 💡 선생님께서 찾아주신 필드형 메모(type="MEMO") 패턴을 완벽히 차단하는 함수
 const checkHwpxMemos = async (file) => {
   try {
     const arrayBuffer = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(arrayBuffer);
 
     for (const fileName of Object.keys(zip.files)) {
-      if (zip.files[fileName].dir || !fileName.toLowerCase().endsWith('.xml')) continue;
-
-      // 1. 파일명에 메모(memo)나 댓글(comment)이 포함된 전용 파일이 있으면 즉시 차단
+      if (zip.files[fileName].dir) continue;
+      
       const lowerName = fileName.toLowerCase();
-      if ((lowerName.includes('memo') || lowerName.includes('comment')) && !lowerName.includes('header')) {
+      
+      // 1. 메모 관련 파일명 차단
+      if (/(memo|comment|reply|annotation)/.test(lowerName) && !lowerName.includes('header')) {
         return true;
       }
 
-      const xmlText = await zip.files[fileName].async('string');
-      
-      // 2. 오진 방지: 문서 기본 서식인 memoShape, memoPr 태그를 문자열에서 임시로 삭제
-      const safeXml = xmlText.replace(/<\/?(?:[\w\-]+:)?memo(shape|pr)[^>]*>/gi, '').toLowerCase();
+      // 2. 본문 XML 정밀 스캔
+      if (lowerName.endsWith('.xml') && !['header', 'settings', 'version'].some(ex => lowerName.includes(ex))) {
+        const xmlText = await zip.files[fileName].async('string');
+        const lowerXml = xmlText.toLowerCase();
 
-      // 3. 실제 '메모'와 '댓글' 태그(<, </ 형태)가 하나라도 본문에 남아있는지 스캔
-      // 사용자가 문서 본문에 직접 타건한 "<댓글>" 글자는 XML에서 "&lt;댓글&gt;"로 치환되므로 텍스트 오진 우려 없음
-      const targetTags = [
-        '<hp:memo', '<memo', '</hp:memo', '</memo',
-        '<hp:comment', '<comment', '</hp:comment', '</comment',
-        '<hc:comment', '</hc:comment',
-        '<hp:reply', '<reply', '</hp:reply', '</reply'
-      ];
-
-      if (targetTags.some(tag => safeXml.includes(tag))) {
-        return true; // 메모나 댓글 발견 시 즉시 업로드 차단
+        // 선생님께서 찾아주신 패턴: type="MEMO", Command="MEMO" 등 필드에 숨겨진 메모 정확히 조준
+        if (
+          lowerXml.includes('type="memo"') || 
+          lowerXml.includes('command">memo') ||
+          lowerXml.includes('id">memo') ||
+          lowerXml.includes('<hp:memo') || 
+          lowerXml.includes('<hp:comment') ||
+          lowerXml.includes('<hc:comment') ||
+          lowerXml.includes('dutmal')
+        ) {
+          return true;
+        }
       }
     }
     return false;
   } catch (error) {
     console.error("파일 스캔 오류:", error);
-    throw error; // 검사 중 브라우저가 뻗으면 무사통과되지 않도록 강제 차단 (Fail-Closed)
+    return true; // 오류 발생 시 강제 차단
   }
 };
 
