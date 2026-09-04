@@ -335,7 +335,7 @@ if (hasMemo) {
   if (isLoadingConfig) return <div className="min-h-screen bg-zinc-100 flex items-center justify-center font-bold text-zinc-500">서버 연결 및 시스템 설정 불러오는 중...</div>;
 
   return (
-    <div onContextMenu={(e) => e.preventDefault()} className="h-screen overflow-hidden bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-6 flex flex-col relative">
+    <div onContextMenu={(e) => e.preventDefault()} className="h-screen overflow-hidden bg-zinc-100 text-zinc-900 font-sans p-2 sm:p-3 flex flex-col relative">
       {popup.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full border border-zinc-200 text-center animate-in fade-in zoom-in duration-200">
@@ -378,8 +378,8 @@ if (hasMemo) {
         </div>
       )}
 
-      <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden flex-1 flex flex-col">
-        <div className="p-6 sm:p-8 border-b border-zinc-200 bg-zinc-900 text-white flex justify-between items-center">
+      <div className="w-full bg-white rounded-2xl shadow-xl border border-zinc-300 overflow-hidden flex-1 flex flex-col min-h-0">
+        <div className="p-4 sm:p-5 border-b border-zinc-200 bg-zinc-900 text-white flex justify-between items-center shrink-0">
           <div>
             <span className="text-xs font-bold tracking-widest text-zinc-400 uppercase">{termInfo.year}학년도 {termInfo.semester}</span>
             <h1 className="text-2xl sm:text-3xl font-black mt-1 tracking-tight">평가계획 제출 시스템</h1>
@@ -400,7 +400,7 @@ if (hasMemo) {
                 <h2 className="text-2xl font-black text-zinc-900">평가계획 파일 제출</h2>
                 <button type="button" onClick={handleOpenMyFiles} className="bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-zinc-700 font-bold px-4 py-2 rounded-lg text-sm cursor-pointer">👀 내가 제출한 파일 확인</button>
               </div>
-              <form onSubmit={handleSubmit} className="bg-zinc-50 p-8 sm:p-12 rounded-3xl border border-zinc-200 shadow-sm space-y-8">
+              <form onSubmit={handleSubmit} className="bg-zinc-50 p-4 sm:p-6 rounded-2xl border border-zinc-200 shadow-sm space-y-4 shrink-0">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div>
                     <label className="block text-sm font-bold text-zinc-700 mb-2">교과 구분</label>
@@ -618,7 +618,7 @@ if (hasMemo) {
           )}
         </div>
       </div>
-      <div className="mt-6 mb-2 text-center text-sm font-bold text-zinc-400 tracking-widest select-none">
+      <div className="mt-2 mb-1 text-center text-[10px] font-bold text-zinc-400 tracking-widest select-none shrink-0">
         created by. 쿙쌤
       </div>
     </div>
